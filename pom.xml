@@ -4,12 +4,12 @@
   <parent>
     <artifactId>addons-parent-pom</artifactId>
     <groupId>org.exoplatform.addons</groupId>
-    <version>15-M02</version>
+    <version>15-microservices-SNAPSHOT</version>
     <relativePath />
   </parent>
   <groupId>org.exoplatform.addons.notes</groupId>
   <artifactId>notes</artifactId>
-  <version>1.1.x-SNAPSHOT</version>
+  <version>1.1.x-microservices-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>eXo PLF:: Notes</name>
   <description>eXo Notes</description>
@@ -30,9 +30,9 @@
     <!-- **************************************** -->
     <!-- Project Dependencies                     -->
     <!-- **************************************** -->
-    <org.exoplatform.social.version>6.3.x-SNAPSHOT</org.exoplatform.social.version>
-    <org.exoplatform.platform-ui.version>6.3.x-SNAPSHOT</org.exoplatform.platform-ui.version>
-    <addon.exo.gamification.version>2.3.x-SNAPSHOT</addon.exo.gamification.version>
+    <org.exoplatform.social.version>6.3.x-microservices-SNAPSHOT</org.exoplatform.social.version>
+    <org.exoplatform.platform-ui.version>6.3.x-microservices-SNAPSHOT</org.exoplatform.platform-ui.version>
+    <addon.exo.gamification.version>2.3.x-microservices-SNAPSHOT</addon.exo.gamification.version>
     
     <!-- Sonar properties -->
     <sonar.organization>meeds-io</sonar.organization>
