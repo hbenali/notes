@@ -10,7 +10,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.servlet.ServletContext;
+import jakarta.servlet.ServletContext;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
 

@@ -16,7 +16,7 @@
  */
 package org.exoplatform.wiki.service;
 
-import javax.servlet.ServletContext;
+import jakarta.servlet.ServletContext;
 import javax.ws.rs.core.Response;
 
 /**

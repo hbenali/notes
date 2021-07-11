@@ -26,8 +26,8 @@ import org.exoplatform.webui.event.EventListener;
 import org.exoplatform.wiki.WikiPortletPreference;
 import org.exoplatform.wiki.webui.core.UIWikiContainer;
 import org.exoplatform.portal.webui.util.Util;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.Cookie;
 
 @ComponentConfig(
                  lifecycle = Lifecycle.class,

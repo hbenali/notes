@@ -134,14 +134,14 @@ public class WikiRestServiceImpl implements ResourceContainer {
                          @PathParam("pageId") String pageId) {
     EnvironmentContext env = EnvironmentContext.getCurrent();
     HttpServletRequest req = (HttpServletRequest) env.get(HttpServletRequest.class);
-    boolean isMultipart = FileUploadBase.isMultipartContent(req);
+    boolean isMultipart = FileUploadBase.isMultipartContent((javax.servlet.http.HttpServletRequest) req);
     if (isMultipart) {
       DiskFileUpload upload = new DiskFileUpload();
       // Parse the request
       try {
         String attachmentName = null;
 
-        List<FileItem> items = upload.parseRequest(req);
+        List<FileItem> items = upload.parseRequest((javax.servlet.http.HttpServletRequest) req);
         for (FileItem fileItem : items) {
           InputStream inputStream = fileItem.getInputStream();
           byte[] imageBytes;

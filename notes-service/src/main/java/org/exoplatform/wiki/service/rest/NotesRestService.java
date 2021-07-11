@@ -16,10 +16,16 @@
  */
 package org.exoplatform.wiki.service.rest;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.annotations.*;
 import io.swagger.jaxrs.PATCH;
+import java.net.URLDecoder;
+import java.util.*;
+
+import javax.annotation.security.RolesAllowed;
+import jakarta.servlet.http.HttpServletRequest;
+import javax.ws.rs.*;
+import javax.ws.rs.core.*;
+
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.math.NumberUtils;
