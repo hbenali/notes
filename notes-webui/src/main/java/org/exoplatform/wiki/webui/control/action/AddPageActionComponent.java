@@ -37,7 +37,7 @@ import org.exoplatform.wiki.webui.control.filter.EditPagesPermissionFilter;
 import org.exoplatform.wiki.webui.control.filter.IsViewModeFilter;
 import org.exoplatform.wiki.webui.control.listener.AddContainerActionListener;
 
-import javax.servlet.http.HttpSession;
+import jakarta.servlet.http.HttpSession;
 import java.util.Arrays;
 import java.util.List;
 import java.util.ResourceBundle;
