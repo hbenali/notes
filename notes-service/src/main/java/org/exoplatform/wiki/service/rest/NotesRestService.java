@@ -20,11 +20,14 @@ import io.swagger.annotations.*;
 import io.swagger.jaxrs.PATCH;
 import java.net.URLDecoder;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import javax.annotation.security.RolesAllowed;
 import jakarta.servlet.http.HttpServletRequest;
 import javax.ws.rs.*;
 import javax.ws.rs.core.*;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
@@ -60,21 +63,6 @@ import org.exoplatform.wiki.tree.utils.TreeUtils;
 import org.exoplatform.wiki.utils.Utils;
 import org.exoplatform.wiki.utils.NoteConstants;
 import org.json.JSONObject;
-
-import javax.annotation.security.RolesAllowed;
-import javax.servlet.http.HttpServletRequest;
-import javax.ws.rs.*;
-import javax.ws.rs.core.CacheControl;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
-import java.io.*;
-import java.net.URLDecoder;
-import java.nio.charset.StandardCharsets;
-import java.util.*;
-import java.util.stream.Collectors;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
-import java.util.zip.ZipOutputStream;
 
 @Path("/notes")
 @Api(value = "/notes", description = "Managing notes")
