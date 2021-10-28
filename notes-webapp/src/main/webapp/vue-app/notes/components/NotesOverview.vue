@@ -92,7 +92,7 @@
         <div
           v-if="notes.content"
           class="notes-application-content text-color"
-          v-html="notes.content">
+          v-html="targetBlank(notes.content)">
         </div>
         <div v-else class="notes-application-content">
           <p class="body-2 font-italic">
@@ -346,7 +346,24 @@ export default {
       this.type=message.type;
       this.alert = true;
       window.setTimeout(() => this.alert = false, 5000);
-    }
+    },
+    targetBlank: function (content) {
+      const internal = location.host + eXo.env.portal.context;
+      const domParser = new DOMParser();
+      const docElement = domParser.parseFromString(content, 'text/html').documentElement;
+      const links = docElement.getElementsByTagName('a');
+      for (const link of links) {
+        let href = link.href.replace(/(^\w+:|^)\/\//, '');
+        if (href.endsWith('/')) {
+          href = href.slice(0, -1);
+        }
+        if (href !== location.host && !href.startsWith(internal)) {
+          link.setAttribute('target', '_blank');
+          link.setAttribute('rel', 'noopener noreferrer');
+        }
+      }
+      return docElement.innerHTML;
+    },
   }
 };
 </script>
