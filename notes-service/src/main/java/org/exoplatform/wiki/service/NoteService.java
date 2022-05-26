@@ -17,13 +17,17 @@
 
 package org.exoplatform.wiki.service;
 
-import org.exoplatform.services.security.Identity;
-import org.exoplatform.wiki.WikiException;
-import org.exoplatform.wiki.mow.api.*;
-import org.gatein.api.EntityNotFoundException;
-
 import java.io.IOException;
 import java.util.List;
+
+import org.gatein.api.EntityNotFoundException;
+
+import org.exoplatform.commons.utils.PageList;
+import org.exoplatform.services.security.Identity;
+import org.exoplatform.wiki.WikiException;
+import org.exoplatform.wiki.model.*;
+import org.exoplatform.wiki.service.search.SearchResult;
+import org.exoplatform.wiki.service.search.WikiSearchData;
 
 /**
  * Provides functions for processing database with notes, including: adding,
@@ -297,7 +301,6 @@ public interface NoteService {
 
   boolean isExisting(String noteBookType, String noteBookOwner, String noteId) throws WikiException;
 
-  Page getNoteByRootPermission(String noteBookType, String noteBookOwner, String noteId) throws WikiException;
 
   /**
    * Update draft note for an existing page
@@ -355,13 +358,91 @@ public interface NoteService {
    */
   DraftPage createDraftForNewPage(DraftPage draftNoteToSave, long currentTimeMillis) throws WikiException;
 
+  /**
+   * Return the list of children of the note to export
+   *
+   * @param note   The Note to export
+   * @param userId the current user Id
+   * @return the list of children of the note to export
+   * @throws WikiException
+   */
   List<NoteToExport> getChildrenNoteOf(NoteToExport note, String userId) throws WikiException;
 
+  /**
+   * Return the Parent of the note to export
+   *
+   * @param note   The Note to export
+   * @return the parent of the note to export
+   * @throws WikiException
+   */
   NoteToExport getParentNoteOf(NoteToExport note) throws WikiException;
 
-  void importNotes(String zipLocation, Page parent, String conflict, Identity userIdentity) throws WikiException, IllegalAccessException, IOException;
+  /**
+   * Return the content of the note to be rendred
+   *
+   * @param note   The Note
+   * @return Content to be rendred
+   * @throws WikiException
+   */
+  String getNoteRenderedContent(Page note);
 
+  /**
+   * Import Notes from a zip file location
+   *
+   * @param zipLocation   the zip file location path
+   * @param parent   The parent page where notes will be impoprted
+   * @param conflict import strategy ( can be "overwrite","replaceAll","duplicate" or "duplicate")
+   * @param userIdentity current user Identity
+   * @throws WikiException if an error occured
+   * @throws IllegalAccessException if the user don't have edit rights on the note
+   * @throws IOException if can't read zip file
+   */
+  void importNotes(String zipLocation, Page parent, String conflict, Identity userIdentity) throws WikiException,
+                                                                                            IllegalAccessException,
+                                                                                            IOException;
+
+  /**
+   * Import Notes from a list if files
+   *
+   * @param files   the zlist of files
+   * @param parent   The parent page where notes will be impoprted
+   * @param conflict import strategy ( can be "overwrite","replaceAll","duplicate" or "duplicate")
+   * @param userIdentity current user Identity
+   * @throws WikiException if an error occured
+   * @throws IllegalAccessException if the user don't have edit rights on the note
+   * @throws IOException if can't read files
+   */
   void importNotes(List<String> files, Page parent, String conflict, Identity userIdentity) throws WikiException,
-          IllegalAccessException,
-          IOException;
+                                                                                            IllegalAccessException,
+                                                                                            IOException;
+
+  /**
+   * Searches in all wiki pages.
+   *
+   * @param data The data to search.
+   * @return Search results.
+   * @throws WikiException if an error occured if an error occured
+   */
+  PageList<SearchResult> search(WikiSearchData data) throws WikiException;
+
+  /**
+   * Gets a wiki page regardless of the current user's permission.
+   *
+   * @param wikiType It can be Portal, Group, or User.
+   * @param wikiOwner The Wiki owner.
+   * @param pageId Id of the wiki page.
+   * @return The wiki page.
+   * @throws WikiException if an error occured if an error occured
+   */
+  Page getNoteByRootPermission(String wikiType, String wikiOwner, String pageId) throws WikiException;
+
+  /**
+   * Checks if the given user has the permission on a page
+   * @param user the userName
+   * @param page the wiki page object
+   * @param permissionType permission Type
+   * @return true if user has permissions
+   * @throws WikiException if an error occured
+   */
+  boolean hasPermissionOnPage(Page page, PermissionType permissionType, Identity user) throws WikiException;
 }

@@ -16,7 +16,6 @@
   <modules>
     <module>notes-service</module>
     <module>notes-webapp</module>
-    <module>notes-webui</module>
     <module>notes-social-integration</module>
     <module>notes-packaging</module>
   </modules>
@@ -85,11 +84,6 @@
       <dependency>
         <groupId>${project.groupId}</groupId>
         <artifactId>notes-service</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>${project.groupId}</groupId>
-        <artifactId>notes-webui</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
