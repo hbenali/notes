@@ -1,4 +1,4 @@
-name: Sonar Analysis
+name: Build
 on:
   push:
     branches:
@@ -6,30 +6,21 @@ on:
   pull_request:
 jobs:
   build:
-    name: Analyse Module with SonarCloud
+    name: Build & Deploy
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v2
-        with:
-          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
-      - name: Set up JDK 11
+
+      - name: Set up JDK 1.8
         uses: actions/setup-java@v1
         with:
-          java-version: 11
-      - name: Cache SonarCloud packages
-        uses: actions/cache@v1
-        with:
-          path: ~/.sonar/cache
-          key: ${{ runner.os }}-sonar
-          restore-keys: ${{ runner.os }}-sonar
-      - name: Cache Maven packages
-        uses: actions/cache@v1
-        with:
-          path: ~/.m2
-          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-m2
-      - name: Build and analyze
+          java-version: 1.8
+
+      - name: Build with Maven
+        run: mvn --batch-mode --update-snapshots install
+
+      - name: Deploy to GitHub
+        run: mvn --batch-mode -DskipTests -DuseGitHubPackages=true deploy
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: mvn -B test org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Pcoverage
+          GITHUB_TOKEN: ${{ secrets.DEPLOY_GITHUB_TOKEN }}
