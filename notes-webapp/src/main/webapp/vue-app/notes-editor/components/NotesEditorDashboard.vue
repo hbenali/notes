@@ -550,7 +550,9 @@ export default {
           removePlugins = `${removePlugins},${ckEditorRemovePlugins}`;
         }
       }
-
+      CKEDITOR.addCss('h1 { font-size: 32px;font-weight: bold;}');
+      CKEDITOR.addCss('h2 { font-size: 24px;font-weight: bold;}');
+      CKEDITOR.addCss('h3 { font-size: 18.5px;font-weight: bold;}');
       CKEDITOR.addCss('.cke_editable { font-size: 14px;}');
       CKEDITOR.addCss('.placeholder { color: #5f708a!important;}');
 
@@ -565,11 +567,13 @@ export default {
         removePlugins: removePlugins,
         allowedContent: true,
         spaceURL: self.spaceURL,
-        spaceGroupId: `/spaces/${  this.spaceGroupId}`,
+        spaceGroupId: `/spaces/${this.spaceGroupId}`,
         imagesDownloadFolder: 'notes/images',
         toolbarLocation: 'top',
         extraAllowedContent: 'table[!summary]; img[style,class,src,referrerpolicy,alt,width,height]; span(*)[*]{*}; span[data-atwho-at-query,data-atwho-at-value,contenteditable]; a[*];i[*];',
         removeButtons: '',
+        enterMode: CKEDITOR.ENTER_BR,
+        shiftEnterMode: CKEDITOR.ENTER_BR,
         toolbar: [
           { name: 'format', items: ['Format'] },
           { name: 'basicstyles', items: [ 'Bold', 'Italic', 'Underline', 'Strike', '-', 'RemoveFormat'] },

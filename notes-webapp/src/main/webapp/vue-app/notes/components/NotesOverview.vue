@@ -4,7 +4,6 @@
     role="main"
     flat>
     <div>
-      <notes-notification-alert />
       <div
         v-if="isAvailableNote"
         class="notes-application white border-radius pa-6"
@@ -817,11 +816,13 @@ export default {
         }
       }
       for (const table of tables) {
-        if (!table.hasAttribute('summary')) {
+        if (!table.hasAttribute('summary') || table?.summary?.trim().length) {
           const customId = table.parentElement.id.split('-').pop();
           const tableSummary = document.getElementById(`summary-${customId}`);
-          if ( tableSummary !== null ) {
+          if ( tableSummary !== null && tableSummary.innerText.trim().length) {
             table.setAttribute('summary', tableSummary.innerText);
+          } else {
+            table.removeAttribute('summary');
           }
         }
       }
