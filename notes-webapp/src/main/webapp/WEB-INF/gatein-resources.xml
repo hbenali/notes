@@ -210,7 +210,6 @@
     </depends>
   </module>
 
-
   <module>
     <name>html2canvas</name>
     <script>

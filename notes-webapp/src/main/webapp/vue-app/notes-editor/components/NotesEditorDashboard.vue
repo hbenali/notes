@@ -53,8 +53,10 @@
       </div>
 
       <form class="notes-content">
-        <div class="notes-content-form px-4">
-          <div v-if="!webPageNote" class="formInputGroup notesTitle mx-3">
+        <div class="notes-content-form singlePageApplication my-5 mx-auto py-1 px-5">
+          <div
+            v-if="!webPageNote"
+            class="formInputGroup notesTitle white px-5">
             <input
               id="notesTitle"
               ref="noteTitle"
@@ -141,6 +143,7 @@ export default {
       navigationLabel: `${this.$t('notes.label.Navigation')}`,
       noteNavigationDisplayed: false,
       spaceGroupId: null,
+      oembedMinWidth: 300,
     };
   },
   computed: {
@@ -333,6 +336,7 @@ export default {
     fillNote(data) {
       this.initActualNoteDone = false;
       if (data) {
+        data.content = this.getContentToEdit(data.content);
         this.note = data;
         this.actualNote = {
           id: this.note.id,
@@ -508,98 +512,49 @@ export default {
       if (CKEDITOR.instances['notesContent'] && CKEDITOR.instances['notesContent'].destroy) {
         CKEDITOR.instances['notesContent'].destroy(true);
       }
-      CKEDITOR.plugins.addExternal('video','/notes/javascript/eXo/wiki/ckeditor/plugins/video/','plugin.js');
-      CKEDITOR.plugins.addExternal('insertOptions','/notes/javascript/eXo/wiki/ckeditor/plugins/insertOptions/','plugin.js');
-      CKEDITOR.plugins.addExternal('toc','/notes/javascript/eXo/wiki/ckeditor/plugins/toc/','plugin.js');
 
       CKEDITOR.dtd.$removeEmpty['i'] = false;
-      let extraPlugins = 'sharedspace,simpleLink,font,justify,widget,video,insertOptions,contextmenu,tabletools,tableresize,toc';
-      let removePlugins = 'image,confirmBeforeReload,maximize,resize';
-      const windowWidth = $(window).width();
-      const windowHeight = $(window).height();
-      if (windowWidth > windowHeight && windowWidth < this.SMARTPHONE_LANDSCAPE_WIDTH) {
-        // Disable suggester on smart-phone landscape
-        extraPlugins = 'simpleLink';
-      }
 
-      const ckEditorExtensions = extensionRegistry.loadExtensions('WYSIWYGPlugins', 'image');
-      if (ckEditorExtensions && ckEditorExtensions.length) {
-        const ckEditorExtraPlugins = ckEditorExtensions.map(ckEditorExtension => ckEditorExtension.extraPlugin).join(',');
-        const ckEditorRemovePlugins = ckEditorExtensions.map(ckEditorExtension => ckEditorExtension.removePlugin).join(',');
-        if (ckEditorExtraPlugins) {
-          extraPlugins = `${extraPlugins},${ckEditorExtraPlugins}`;
+      CKEDITOR.on('dialogDefinition', function (e) {
+        if (e.data.name === 'link') {
+          const informationTab = e.data.definition.getContents('target');
+          const targetField = informationTab.get('linkTargetType');
+          targetField['default'] = '_self';
+          targetField.items = targetField.items.filter(t => ['_self', '_blank'].includes(t[1]));
         }
-        if (ckEditorRemovePlugins) {
-          removePlugins = `${removePlugins},${ckEditorRemovePlugins}`;
-        }
-      }
-      CKEDITOR.addCss('h1 { font-size: 34px;font-weight: 400;}');
-      CKEDITOR.addCss('h2 { font-size: 28px;font-weight: 400;}');
-      CKEDITOR.addCss('h3 { font-size: 21.84px;font-weight: 400;}');
-      CKEDITOR.addCss('p,li { font-size: 18.6667px;}');
-      CKEDITOR.addCss('blockquote p { font-size: 17.5px;font-weight: 300;}');
-      CKEDITOR.addCss('.cke_editable { font-size: 14px; line-height: 1.4 !important;}');
-      CKEDITOR.addCss('.placeholder { color: #5f708a!important;}');
-
+      });
       // this line is mandatory when a custom skin is defined
-
       CKEDITOR.basePath = '/commons-extension/ckeditor/';
       const self = this;
 
       $('textarea#notesContent').ckeditor({
         customConfig: `${eXo.env.portal.context}/${eXo.env.portal.rest}/richeditor/configuration?type=notes&v=${eXo.env.client.assetsVersion}`,
-        extraPlugins: extraPlugins,
-        removePlugins: removePlugins,
         allowedContent: true,
         spaceURL: self.spaceURL,
         spaceGroupId: `/spaces/${this.spaceGroupId}`,
         imagesDownloadFolder: 'DRIVE_ROOT_NODE/notes/images',
         toolbarLocation: 'top',
-        extraAllowedContent: 'table[!summary]; img[style,class,src,referrerpolicy,alt,width,height]; span(*)[*]{*}; span[data-atwho-at-query,data-atwho-at-value,contenteditable]; a[*];i[*];',
+        extraAllowedContent: 'table[summary];img[style,class,src,referrerpolicy,alt,width,height];span(*)[*]{*}; span[data-atwho-at-query,data-atwho-at-value,contenteditable]; a[*];i[*];',
         removeButtons: '',
-        enterMode: CKEDITOR.ENTER_BR,
+        enterMode: CKEDITOR.ENTER_P,
         shiftEnterMode: CKEDITOR.ENTER_BR,
-        toolbar: [
-          { name: 'format', items: ['Format'] },
-          { name: 'basicstyles', items: [ 'Bold', 'Italic', 'Underline', 'Strike', '-', 'RemoveFormat'] },
-          { name: 'paragraph', items: [ 'NumberedList', 'BulletedList', '-', 'Blockquote' ] },
-          { name: 'fontsize', items: ['FontSize'] },
-          { name: 'colors', items: [ 'TextColor' ] },
-          { name: 'align', items: [ 'JustifyLeft', 'JustifyCenter', 'JustifyRight', 'JustifyBlock'] },
-          { name: 'insert' },
-          { name: 'links', items: [ 'simpleLink','InsertOptions'] },
-        ],
+        copyFormatting_allowedContexts: true,
+        indentBlock: {
+          offset: 40,
+          unit: 'px'
+        },
         format_tags: 'p;h1;h2;h3',
-        autoGrow_minHeight: self.noteFormContentHeight,
-        height: self.noteFormContentHeight,
         bodyClass: 'notesContent',
         dialog_noConfirmCancel: true,
+        colorButton_enableMore: true,
         sharedSpaces: {
           top: 'notesTop'
         },
         on: {
           instanceReady: function (evt) {
-            //self.note.content = evt.editor.getData();
             self.actualNote.content = evt.editor.getData();
             CKEDITOR.instances['notesContent'].removeMenuItem('linkItem');
             CKEDITOR.instances['notesContent'].removeMenuItem('selectImageItem');
-            CKEDITOR.instances['notesContent'].contextMenu.addListener( function( element ) {
-              if ( element.getAscendant( 'table', true ) ) {
-                return {
-                  tableProperties: CKEDITOR.TRISTATE_ON
-                };
-              }
-            });
-            CKEDITOR.instances['notesContent'].addCommand('tableProperties', {
-              exec: function() {
-                if (CKEDITOR.instances['notesContent'].elementPath() && CKEDITOR.instances['notesContent'].elementPath().contains( 'table', 1 )){
-                  const tableSummary = CKEDITOR.instances['notesContent'].elementPath().contains( 'div', 1 ).$.firstChild.innerText;
-                  const table=CKEDITOR.instances['notesContent'].elementPath().contains( 'table', 1 ).getAttributes();
-                  self.$refs.noteTablePlugins.open(table, tableSummary);
-                }
-
-              }
-            });
             $(CKEDITOR.instances['notesContent'].document.$)
               .find('.atwho-inserted')
               .each(function() {
@@ -667,7 +622,7 @@ export default {
           }
         }
       });
-      this.instance =CKEDITOR.instances['notesContent'];
+      this.instance = CKEDITOR.instances['notesContent'];
     },
     setToolBarEffect() {
       const element = CKEDITOR.instances['notesContent'] ;
@@ -853,9 +808,67 @@ export default {
         return false;
       }
     },
+    getContentToEdit(content) {
+      const domParser = new DOMParser();
+      const docElement = domParser.parseFromString(content, 'text/html').documentElement;
+      this.restoreOembed(docElement);
+      this.restoreUnHighlightedCode(docElement);
+      return docElement?.children[1].innerHTML;
+    },
+    restoreUnHighlightedCode(documentElement) {
+      documentElement.querySelectorAll('code.hljs').forEach(code => {
+        code.innerHTML = code.innerText;
+        code.classList.remove('hljs');
+      });
+    },
+    restoreOembed(documentElement) {
+      documentElement.querySelectorAll('div.embed-wrapper').forEach(wrapper => {
+        const oembed = document.createElement('oembed');
+        oembed.innerHTML = wrapper.dataset.url;
+        wrapper.replaceWith(oembed);
+      });
+    },
+    preserveEmbedded(body, documentElement) {
+      const iframes = body.querySelectorAll('[data-widget="embedSemantic"] div iframe');
+      if (iframes.length) {
+        documentElement.querySelectorAll('oembed').forEach((oembed, index) => {
+          const wrapper = document.createElement('div');
+          wrapper.dataset.url = decodeURIComponent(oembed.innerHTML);
+          wrapper.innerHTML = iframes[index]?.parentNode?.innerHTML;
+          const width = iframes[index]?.parentNode?.offsetWidth;
+          const height = iframes[index]?.parentNode?.offsetHeight;
+          const aspectRatio = width / height;
+          const minHeight = parseInt(this.oembedMinWidth) / aspectRatio;
+          const style = `
+            min-height: ${minHeight}px;
+            min-width: ${this.oembedMinWidth}px;
+            width: 100%;
+            margin-bottom: 10px;
+            aspect-ratio: ${aspectRatio};
+          `;
+          wrapper.setAttribute('style', style);
+          wrapper.setAttribute('class', 'embed-wrapper d-flex position-relative ml-auto mr-auto');
+          oembed.replaceWith(wrapper);
+        });
+      }
+    },
+    preserveHighlightedCode(body, documentElement) {
+      const codes = body.querySelectorAll('pre[data-widget="codeSnippet"] code');
+      if (codes.length) {
+        documentElement.querySelectorAll('code').forEach((code, index) => {
+          code.innerHTML = codes[index]?.innerHTML;
+          code.setAttribute('class', codes[index]?.getAttribute('class'));
+        });
+      }
+    },
     getBody: function() {
+      const domParser = new DOMParser();
       const newData = CKEDITOR.instances['notesContent'].getData();
-      return newData ? newData : null;
+      const body = CKEDITOR.instances['notesContent'].document.getBody().$;
+      const documentElement = domParser.parseFromString(newData, 'text/html').documentElement;
+      this.preserveEmbedded(body, documentElement);
+      this.preserveHighlightedCode(body, documentElement);
+      return documentElement?.children[1].innerHTML;
     }
   }
 };

@@ -6,10 +6,10 @@
     <div>
       <div
         v-if="isAvailableNote"
-        class="notes-application white border-radius pa-6"
+        class="notes-application white border-radius pa-5"
         ref="content">
         <div class="notes-application-header">
-          <div class="notes-title d-flex justify-space-between pb-4">
+          <div class="notes-title d-flex justify-space-between pb-4 ps-1">
             <span
               ref="noteTitle"
               class="title text-color mt-n1">
@@ -199,9 +199,7 @@
             :items="noteAllChildren"
             item-key="noteId">
             <template #label="{ item }">
-              <v-list-item-title @click="openNoteChild(item)" class="body-2 clickable primary--text">
-                <span>{{ item.name }}</span>
-              </v-list-item-title>
+              <note-content-table-item :note="item" />
             </template>
           </v-treeview>
         </div>
@@ -345,7 +343,7 @@ export default {
   computed: {
     notesContentProcessor() {
       return {
-        template: `<div class='reset-style-box rich-editor-content'>${this.formatContent(this.noteContent)}</div>`,
+        template: `<div class='reset-style-box rich-editor-content extended-rich-content'>${this.formatContent(this.noteContent)}</div>`,
         data() {
           return {
             vTreeComponent: {
@@ -354,9 +352,7 @@ export default {
               :items="noteChildItems" \
               item-key="noteId"> \
               <template #label="{ item }"> \
-                <v-list-item-title @click="openNoteChild(item)" class="body-2 clickable primary--text"> \
-                <span>{{ item.name }}</span> \
-              </v-list-item-title> \
+                <note-content-table-item :note="item" />\
               </template> \
               </v-treeview >',
               props: {
@@ -815,7 +811,6 @@ export default {
           href = href.slice(0, -1);
         }
         if (href !== location.host && !href.startsWith(internal)) {
-          link.setAttribute('target', '_blank');
           link.setAttribute('rel', 'noopener noreferrer');
         }
       }
