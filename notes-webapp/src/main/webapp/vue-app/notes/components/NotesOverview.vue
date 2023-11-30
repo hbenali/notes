@@ -355,7 +355,7 @@ export default {
   computed: {
     notesContentProcessor() {
       return {
-        template: `<div class='reset-style-box rich-editor-content extended-rich-content'>${this.formatContent(this.noteContent)}</div>`,
+        template: `<div class='reset-style-box rich-editor-content extended-rich-content'>${this.$noteUtils.getContentToDisplay(this.noteContent, this.note?.id, this.noteBookType, this.noteBookOwner, true)}</div>`,
         data() {
           return {
             vTreeComponent: {
@@ -421,7 +421,7 @@ export default {
       return this.allNoteVersionsCount > this.versionsPageSize;
     },
     noteVersionContent() {
-      return this.note.content && this.noteContent && this.formatContent(this.noteContent);
+      return this.note.content && this.noteContent && this.$noteUtils.getContentToDisplay(this.noteContent, this.note?.id, this.noteBookType, this.noteBookOwner, true);
     },
     isHomeNoteDefaultContent() {
       return !this.note.parentPageId && ( this.noteContent===`<h1> Welcome to Space ${this.spaceDisplayName} Notes Home </h1>` || this.noteContent === '');
@@ -580,7 +580,7 @@ export default {
       const baseUrl = window.location.href;
       return `${baseUrl.substring(0, baseUrl.lastIndexOf('/') + 1)}${noteId}`;
     },
-    loadMoreVersions(){
+    loadMoreVersions() {
       this.versionsPageSize += this.versionsPageSize;
     },
     handleChangePages() {
@@ -696,12 +696,11 @@ export default {
         this.isDraft = data.draftPage;
         this.loadData = true;
         this.currentNoteBreadcrumb = this.note.breadcrumb;
-        this.updateURL();
         this.getNoteLanguages(noteId);
         if (!this.note.lang || this.note.lang === ''){
           this.updateSelectedTranslation(this.originalVersion);
-          this.updateURL();
         }
+        this.updateURL();
         if (viewNote){
           this.viewNoteStatistics(this.note);
         }
@@ -732,12 +731,11 @@ export default {
         this.isDraft = data.draftPage;
         this.loadData = true;
         this.currentNoteBreadcrumb = this.note.breadcrumb;
-        this.updateURL();
         this.getNoteLanguages(this.note.id);
-        if (!this.note.lang || this.note.lang === ''){
+        if (!this.note.lang || this.note.lang === '') {
           this.updateSelectedTranslation(this.originalVersion);
-          this.updateURL();
         }
+        this.updateURL();
         if (viewNote){
           this.viewNoteStatistics(this.note);
         }
@@ -872,50 +870,6 @@ export default {
           this.getNoteVersionByNoteId(this.note.id);
         });
     },
-    formatContent (content) {
-      const internal = location.host + eXo.env.portal.context;
-      const domParser = new DOMParser();
-      const docElement = domParser.parseFromString(content, 'text/html').documentElement;
-      const contentChildren = docElement.getElementsByTagName('body')[0].children;
-      const links = docElement.getElementsByTagName('a');
-      const tables = docElement.getElementsByTagName('table');
-      for (const link of links) {
-        let href = link.href.replace(/(^\w+:|^)\/\//, '');
-        if (href.endsWith('/')) {
-          href = href.slice(0, -1);
-        }
-        if (href !== location.host && !href.startsWith(internal)) {
-          link.setAttribute('rel', 'noopener noreferrer');
-        }
-      }
-      for (const table of tables) {
-        if (!table.hasAttribute('summary') || table?.summary?.trim().length) {
-          const customId = table.parentElement.id.split('-').pop();
-          const tableSummary = document.getElementById(`summary-${customId}`);
-          if ( tableSummary !== null && tableSummary.innerText.trim().length) {
-            table.setAttribute('summary', tableSummary.innerText);
-          } else {
-            table.removeAttribute('summary');
-          }
-        }
-      }
-      if (contentChildren) {
-        for (let i = 0; i < contentChildren.length; i++) { // NOSONAR not iterable
-          const child = contentChildren[i];
-          if (child.classList.value.includes('navigation-img-wrapper')) {
-            // Props object
-            const componentProps = {
-              noteId: this.note.id,
-              source: '',
-              noteBookType: this.noteBookType,
-              noteBookOwner: this.noteBookOwner
-            };
-            contentChildren[i].innerHTML = `<component v-bind:is="vTreeComponent" note-id="${componentProps.noteId}" note-book-type="${componentProps.noteBookType}" note-book-owner="${componentProps.noteBookOwner}"></component>`;
-          }
-        }
-      }
-      return docElement?.children[1].innerHTML;
-    },
     openNoteVersionsHistoryDrawer() {
       if (!this.isDraft) {
         if ( this.note.canManage ) {
@@ -960,13 +914,12 @@ export default {
     updateURL(){
       const charsToRemove = notesConstants.PORTAL_BASE_URL.length-notesConstants.PORTAL_BASE_URL.lastIndexOf(`/${this.appName}`);
       let translation = '';
-      if (this.selectedTranslation.value){
+      if (this.selectedTranslation.value) {
         translation = `?translation=${this.selectedTranslation.value}`;
       }
       notesConstants.PORTAL_BASE_URL = `${notesConstants.PORTAL_BASE_URL.slice(0,-charsToRemove)}/${this.appName}/${this.note.id}${translation}`;
-      
       if (!this.popStateChange) {
-        window.history.pushState('notes', '', notesConstants.PORTAL_BASE_URL);
+        window.history.replaceState(window.history.state, window.document.title, notesConstants.PORTAL_BASE_URL);
       }
       this.popStateChange = false;
     },

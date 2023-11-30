@@ -24,21 +24,14 @@
       v-if="fixedToolbar"
       :min-height="richEditorToolbarHeight"
       flat />
-    <rich-editor
+    <note-rich-editor
       v-if="initialized"
       ref="richEditor"
       v-model="pageContent"
       :placeholder="$t('notePageView.placeholder.editText')"
-      :tag-enabled="false"
-      :ck-editor-id="richEditorId"
-      :toolbar-position="isSmall && 'bottom' || 'top'"
+      :instance-id="richEditorId"
+      :toolbar-location="isSmall && 'bottom' || 'top'"
       :large-toolbar="!isSmall"
-      ck-editor-type="notePageInline"
-      focus-position="start"
-      autofocus
-      hide-chars-count
-      disable-auto-grow
-      oembed
       @ready="$root.$emit('notes-editor-ready')"
       @unloaded="$root.$emit('notes-editor-unloaded')" />
     <div
@@ -50,7 +43,18 @@
         'z-index-two': displayFixedToolbar,
       }"
       class="ms-auto me-2 my-2 d-flex align-center justify-end">
-      <v-tooltip v-if="$root.fullPageEditFeature" bottom>
+      <v-tooltip v-if="hasLanguages" bottom>
+        <template #activator="{on, bind}">
+          <div
+            v-on="on"
+            v-bind="bind"
+            class="me-5">
+            <v-icon size="20" color="primary">fa-language</v-icon>
+          </div>
+        </template>
+        <span>{{ $t('notePageView.label.openFullPageWithMultiLanguage') }}</span>
+      </v-tooltip>
+      <v-tooltip bottom>
         <template #activator="{on, bind}">
           <v-btn
             v-on="on"
@@ -91,7 +95,6 @@ export default {
     richEditorId: `notePageInline${parseInt(Math.random() * 10000)}`,
     saving: false,
     initialized: false,
-    siteBody: document.querySelector('#UISiteBody') || document.querySelector('#UIPageBody'),
     topbarHeight: document.querySelector('#UITopBarContainer')?.offsetHeight || 0,
     checkToolbarPosition: false,
     editorTop: 0,
@@ -99,10 +102,14 @@ export default {
     editorX: 0,
     timeout: null,
     fixedToolbar: false,
+    languages: null,
   }),
   computed: {
     note() {
       return this.$root.page;
+    },
+    hasLanguages() {
+      return this.languages?.length;
     },
     parentPageId() {
       return this.note?.parentPageId;
@@ -119,14 +126,15 @@ export default {
       formData.append('showMaxWindow', 'true');
       formData.append('hideSharedLayout', 'true');
       formData.append('webPageNote', 'true');
+      formData.append('webPageUrl', `${window.location.pathname}${window.location.search || ''}`);
+      if (this.note?.lang) {
+        formData.append('translation', this.note.lang);
+      }
       const urlParams = new URLSearchParams(formData).toString();
-      return `${eXo.env.portal.context}/${eXo.env.portal.portalName}/notes-editor?${urlParams}`;
+      return `${eXo.env.portal.context}/${eXo.env.portal.defaultPortal}/notes-editor?${urlParams}`;
     },
     isSmall() {
       return this.$root.isSmall;
-    },
-    ckEditorId() {
-      return `cke_${this.richEditorId}`;
     },
     richEditorElement() {
       return this.$refs?.richEditor?.$el;
@@ -176,13 +184,15 @@ export default {
   },
   mounted() {
     if (!this.isSmall) {
-      this.siteBody.addEventListener('scroll', this.controlBodyScrollClass, false);
+      document.querySelector('#UISiteBody').addEventListener('scroll', this.controlBodyScrollClass, false);
+      document.querySelector('#UIPageBody').addEventListener('scroll', this.controlBodyScrollClass, false);
       window.addEventListener('resize', this.controlBodyScrollClass, false);
       this.$root.$on('notes-editor-ready', this.controlBodyScrollClass);
     }
   },
   beforeDestroy() {
-    this.siteBody.removeEventListener('scroll', this.controlBodyScrollClass, false);
+    document.querySelector('#UISiteBody').removeEventListener('scroll', this.controlBodyScrollClass, false);
+    document.querySelector('#UIPageBody').removeEventListener('scroll', this.controlBodyScrollClass, false);
     window.removeEventListener('resize', this.controlBodyScrollClass, false);
     this.$root.$off('notes-editor-ready', this.controlBodyScrollClass);
   },
@@ -190,7 +200,9 @@ export default {
     init() {
       this.pageContent = this.$root.pageContent || '';
       if (this.$root.pageId) {
-        this.initialized = true;
+        return this.$notesService.getNoteLanguages(this.$root.pageId)
+          .then(languages => this.languages = languages)
+          .finally(() => this.initialized = true);
       } else {
         return this.save()
           .finally(() => this.initialized = true);
@@ -234,6 +246,7 @@ export default {
         wikiOwner: this.note.wikiOwner,
         parentPageId: this.note.parentPageId,
         targetPageId: this.note.id,
+        lang: this.note.lang,
       }, this.note.parentPageId).then(savedDraftNote => {
         localStorage.setItem(`draftNoteId-${this.note.id}`, JSON.stringify(savedDraftNote));
       });
@@ -285,6 +298,6 @@ export default {
         }
       }
     },
-  }
+  },
 };
 </script>
