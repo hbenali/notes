@@ -717,6 +717,9 @@ export default {
         bodyClass: 'notesContent',
         dialog_noConfirmCancel: true,
         colorButton_enableMore: true,
+        isImagePasteBlocked: this.webPageNote,
+        hideUploadImageLink: this.webPageNote,
+        isImageDragBlocked: this.webPageNote,
         sharedSpaces: {
           top: 'notesTop'
         },
