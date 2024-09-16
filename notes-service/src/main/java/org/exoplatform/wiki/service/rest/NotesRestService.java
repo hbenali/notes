@@ -30,6 +30,7 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.ResourceBundle;
 import java.util.Set;
@@ -805,7 +806,7 @@ public class NotesRestService implements ResourceContainer {
           noteService.removeDraftOfNote(noteParams, note.getLang());
         }
       } else if ((featuredImage != null && (featuredImage.isToDelete() || featuredImage.getUploadId() != null))
-          || (note_.getProperties() != null && !notePageProperties.getSummary().equals(note_.getProperties().getSummary()))) {
+          || !Objects.equals(note_.getProperties(), notePageProperties)) {
         if (StringUtils.isBlank(note.getLang())) {
           note_.setProperties(notePageProperties);
           note_ = noteService.updateNote(note_, PageUpdateType.EDIT_PAGE_PROPERTIES, identity);
