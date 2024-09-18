@@ -20,20 +20,6 @@
 
 package org.exoplatform.wiki.jpa;
 
-import static org.exoplatform.wiki.jpa.EntityConverter.convertAttachmentEntityToAttachment;
-import static org.exoplatform.wiki.jpa.EntityConverter.convertAttachmentToDraftPageAttachmentEntity;
-import static org.exoplatform.wiki.jpa.EntityConverter.convertAttachmentToPageAttachmentEntity;
-import static org.exoplatform.wiki.jpa.EntityConverter.convertDraftPageEntityToDraftPage;
-import static org.exoplatform.wiki.jpa.EntityConverter.convertDraftPageToDraftPageEntity;
-import static org.exoplatform.wiki.jpa.EntityConverter.convertPageEntityToPage;
-import static org.exoplatform.wiki.jpa.EntityConverter.convertPageToPageEntity;
-import static org.exoplatform.wiki.jpa.EntityConverter.convertPageVersionEntityToPageHistory;
-import static org.exoplatform.wiki.jpa.EntityConverter.convertPageVersionEntityToPageVersion;
-import static org.exoplatform.wiki.jpa.EntityConverter.convertPermissionEntitiesToPermissionEntries;
-import static org.exoplatform.wiki.jpa.EntityConverter.convertPermissionEntriesToPermissionEntities;
-import static org.exoplatform.wiki.jpa.EntityConverter.convertWikiEntityToWiki;
-import static org.exoplatform.wiki.jpa.EntityConverter.convertWikiToWikiEntity;
-
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.ArrayList;
@@ -105,7 +91,9 @@ import org.exoplatform.wiki.utils.NoteConstants;
 import org.exoplatform.wiki.utils.Utils;
 import org.exoplatform.wiki.utils.VersionNameComparatorDesc;
 
-/**
+import static org.exoplatform.wiki.jpa.EntityConverter.*;
+
+ /**
  * Created by The eXo Platform SAS Author : eXoPlatform exo@exoplatform.com
  * 9/8/15
  */
@@ -382,15 +370,14 @@ public class JPADataStorage implements DataStorage {
 
   @Override
   public void deleteDraftOfPage(Page page) throws WikiException {
-    List<DraftPageEntity> draftPages = draftPageDAO.findDraftPagesByTargetPage(Long.parseLong(page.getId()));
-    for (DraftPageEntity draftPage: draftPages) {
-      if(draftPage != null){
-        deleteAttachmentsOfDraftPage(draftPage);
-      }
-    }
-    draftPageDAO.deleteDraftPagesByTargetPage(Long.valueOf(page.getId()));
+    draftPageDAO.deleteDraftPagesByTargetPage(Long.parseLong(page.getId()));
   }
 
+  @Override
+  public void deleteAttachmentsOfDraftPage(DraftPage draftPage) {
+    deleteAttachmentsOfDraftPage(convertDraftPageToDraftPageEntity(draftPage, pageDAO));
+  }
+  
   @Override
   public void deleteDraftOfPage(Page page, String lang) throws WikiException {
     List<DraftPageEntity> draftPages = draftPageDAO.findDraftPagesByTargetPage(Long.parseLong(page.getId()));
@@ -670,15 +657,21 @@ public class JPADataStorage implements DataStorage {
   }
 
   @Override
-  public List<DraftPage> getDraftsOfPage(Long pageId) {
-    List<DraftPage> draftPages = new ArrayList<>();
-    List<DraftPageEntity> draftPagesOfUser = draftPageDAO.findDraftPagesByTargetPage(pageId);
-    for (DraftPageEntity draft : draftPagesOfUser) {
-      draftPages.add(convertDraftPageEntityToDraftPage(draft));
+  public DraftPage getDraftOfPageByLang(Page page, String lang) throws WikiException {
+    List<DraftPageEntity> draftPages = draftPageDAO.findDraftPagesByTargetPage(Long.parseLong(page.getId()));
+    for (DraftPageEntity draftPage : draftPages) {
+      if (draftPage != null && StringUtils.equals(draftPage.getLang(), lang)) {
+        return convertDraftPageEntityToDraftPage(draftPage);
+      }
     }
-
-    return draftPages;
+    return null;
   }
+
+  @Override
+  public List<DraftPage> getDraftsOfPage(Long pageId) {
+    return convertDraftPageEntitiesToDraftPages(draftPageDAO.findDraftPagesByTargetPage(pageId));
+  }
+  
   @Override
   public DraftPage getDraft(WikiPageParams wikiPageParams) throws WikiException {
     DraftPage latestDraft = null;
@@ -1144,7 +1137,7 @@ public class JPADataStorage implements DataStorage {
 
   @Override
   @ExoTransactional
-  public void addPageVersion(Page page , String userName) throws WikiException {
+  public PageVersion addPageVersion(Page page , String userName) throws WikiException {
     if(page != null) {
       PageEntity pageEntity = fetchPageEntity(page);
 
@@ -1154,7 +1147,6 @@ public class JPADataStorage implements DataStorage {
       }
 
       PageVersionEntity pageVersionEntity = new PageVersionEntity();
-
       Long versionNumber = pageVersionDAO.getLastversionNumberOfPage(pageEntity.getId());
       if(versionNumber == null) {
         versionNumber = 1L;
@@ -1191,13 +1183,15 @@ public class JPADataStorage implements DataStorage {
       pageEntity.setVersions(pageVersionEntities);
 
       pageDAO.update(pageEntity);
+
+      return EntityConverter.convertPageVersionEntityToPageVersion(pageVersionEntity);
     } else {
       throw new WikiException("Cannot create version of a page null");
     }
   }
 
   @Override
-  public void restoreVersionOfPage(String versionName, Page page) throws WikiException {
+  public PageVersion restoreVersionOfPage(String versionName, Page page) throws WikiException {
     if(page != null) {
       PageEntity pageEntity = fetchPageEntity(page);
 
@@ -1211,6 +1205,7 @@ public class JPADataStorage implements DataStorage {
         pageEntity.setContent(versionToRestore.getContent());
         pageEntity.setUpdatedDate(Calendar.getInstance().getTime());
         pageDAO.update(pageEntity);
+        return EntityConverter.convertPageVersionEntityToPageVersion(versionToRestore);
       } else {
         throw new WikiException("Cannot restore version " + versionName + " of a page " + page.getWikiType() + ":"
             + page.getWikiOwner() + ":" + page.getName() + " because version does not exist.");
@@ -1329,7 +1324,7 @@ public class JPADataStorage implements DataStorage {
   }
 
   @ExoTransactional
-  public void deleteAttachmentsOfDraftPage(DraftPageEntity page) throws WikiException {
+  public void deleteAttachmentsOfDraftPage(DraftPageEntity page) {
     List<DraftPageAttachmentEntity> attachmentsEntities = page.getAttachments();
     if (attachmentsEntities != null) {
       for (int i = 0; i < attachmentsEntities.size(); i++) {
@@ -1523,7 +1518,16 @@ public class JPADataStorage implements DataStorage {
     if (pageId == null) {
       throw new IllegalArgumentException("targetPageId argument is null");
     }
-    return convertPageVersionEntityToPageVersion(pageVersionDAO.findLatestVersionByPageIdAndLang(pageId, lang));
+    PageVersion pageVersion =
+                            convertPageVersionEntityToPageVersion(pageVersionDAO.findLatestVersionByPageIdAndLang(pageId, lang));
+    if (pageVersion != null) {
+      Page page = pageVersion.getParent();
+      page.setLang(lang);
+      EntityConverter.buildNotePageMetadata(page, false);
+      pageVersion.setProperties(page.getProperties());
+      return pageVersion;
+    }
+    return null;
   }
 
   /**
@@ -1567,5 +1571,13 @@ public class JPADataStorage implements DataStorage {
   @Override
   public void deleteOrphanDraftPagesByParentPage(long parentPageId) {
     draftPageDAO.deleteOrphanDraftPagesByParentPage(parentPageId);
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public PageVersion getPageVersionById(long versionId) {
+    return EntityConverter.convertPageVersionEntityToPageVersion(pageVersionDAO.find(versionId));
   }
 }

@@ -73,7 +73,7 @@
 
       .notes-content-form {
         min-height: calc(~"100vh - 140px");
-        #cke_notesContent {
+        .notes-content-wrapper > div[role="application"] {
           border-color: transparent;
           flex: 0 1 100%;
           margin-bottom: 0;
@@ -103,6 +103,30 @@
       width: 100%;
       z-index: 10;
       background-color: @baseBackground;
+
+      .translation-button-icon {
+        width: 25px;
+        height: 21px;
+      }
+
+      .editor-icon {
+        margin-bottom: 2px;
+      }
+
+      .close-editor-icon {
+        width: 14px;
+        height: 21px;
+      }
+
+      .save-button-icon {
+        width: 18px;
+        height: 21px;
+      }
+
+      .metadata-button-icon {
+        width: 20px;
+        height: 21px;
+      }
 
       .notesActions {
         .notesFormButtons {
@@ -188,7 +212,80 @@
   }
 }
 
-#notesOverviewApplication, .notesApplication {
+#editorMetadataDrawer {
+
+  .add-image-area, .image-preview {
+    background-color: @primaryBackground !important;
+  }
+
+  .image-pre-upload {
+    .v-image__image {
+      filter: blur(2px);
+    }
+  }
+
+  .cke_bottom {
+    height: auto;
+    opacity: 0.4;
+    background: transparent;
+  }
+
+  .feature-image-trash-icon {
+    width: 18px;
+    height: 21px;
+  }
+
+  .feature-image-file-icon {
+    width: 15px;
+    height: 21px;
+  }
+
+  .feature-image-button {
+    background: @greyColorLighten1Default;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid @whiteColorDefault;
+    color: @whiteColorDefault
+  }
+
+  .summary-metadata-input {
+    .v-input__slot {
+      padding: 0;
+
+      fieldset {
+        padding: 0;
+      }
+
+      .v-text-field__slot {
+        margin: 0;
+
+        textarea {
+          overflow: auto;
+          border: 0;
+          margin: 0 auto;
+          padding: 12px;
+        }
+      }
+    }
+  }
+}
+
+#notesActionMenuBottomDrawer, #notesOverviewApplication,
+                           .notesApplication .notes-application-header .note-actions-menu {
+  .action-menu-item {
+    min-height: 28px !important;
+  }
+
+  .delete-option-color {
+    color: @errorColor;
+  }
+
+  .icon-menu {
+    width: 28px;
+    height: 36px;
+  }
+}
+
+#notesOverviewApplication {
   max-width: 100%;
 
   .notes-wrapper {
@@ -217,11 +314,24 @@
     min-height: calc(~"100vh - 170px");
 
     .notes-application-header {
+      .note-actions-menu {
+        right: 35px ~'; /** orientation=lt */ ';
+        right: auto ~'; /** orientation=rt */ ';
+        top: 50px !important;
+        left: auto ~'!important; /** orientation=lt */ ';
+        left: 35px ~'!important; /** orientation=rt */ ';
+      }
+
+      .note-summary {
+        font-size: 20px;
+        line-height: 1.2;
+      }
+
       .notes-title {
-        .title{
+        .title {
           font-weight: bold;
           font-family: 'Helvetica', 'Arial', sans-serif;
-          font-size: 18px!important;
+          font-size: 34px!important;
         }
         .notes-header-icons {
           min-width: 100px !important;
@@ -229,17 +339,6 @@
 
           button {
             padding: 1px 2px;
-          }
-
-          .note-actions-menu {
-            min-width: 150px !important;
-            right: 7px;
-            top: 25px !important;
-            left: auto !important;
-
-            .action-menu-item {
-              min-height: 30px !important;
-            }
           }
         }
       }
@@ -261,6 +360,12 @@
       .path-clickable {
         max-width: 97% !important;
 
+        &:hover {
+          color: @primaryColor !important;
+        }
+      }
+
+      .not-clickable {
         &:hover {
           color: @primaryColor !important;
         }
@@ -1143,7 +1248,3 @@ ul.note-manual-child  {
 .remove-focus:focus::after {
   opacity: 0 !important;
 }
-
-
-
-

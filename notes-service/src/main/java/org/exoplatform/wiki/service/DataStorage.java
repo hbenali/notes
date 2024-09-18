@@ -71,6 +71,8 @@ public interface DataStorage {
   public Page getPageById(String id) throws WikiException;
 
   public DraftPage getDraftPageById(String id) throws WikiException;
+  
+  public DraftPage getDraftOfPageByLang(Page page, String lang) throws WikiException;
 
   public Page getParentPageOf(Page page) throws WikiException;
   
@@ -197,9 +199,25 @@ public interface DataStorage {
 
   public List<PageHistory> getHistoryOfPage(Page page) throws WikiException;
 
-  public void addPageVersion(Page page, String userName) throws WikiException;
+  /**
+   * Creates a new page version
+   *
+   * @param page target note page
+   * @param userName current username
+   * @return {@link PageVersion}
+   * @throws WikiException
+   */
+  PageVersion addPageVersion(Page page, String userName) throws WikiException;
 
-  public void restoreVersionOfPage(String versionName, Page page) throws WikiException;
+  /**
+   * Restore a note from given version
+   *
+   * @param versionName version name
+   * @param page target note page
+   * @return {@link PageVersion}
+   * @throws WikiException
+   */
+  PageVersion restoreVersionOfPage(String versionName, Page page) throws WikiException;
 
   public Page updatePage(Page page) throws WikiException;
 
@@ -219,6 +237,13 @@ public interface DataStorage {
    * @return the List pf pages of the wiki
    */
   public List<Page> getPagesOfWiki(String wikiType, String wikiOwner);
+
+  /**
+   * Delete attachments of target draft page
+   *
+   * @param draftPage target draft page
+   */
+  void deleteAttachmentsOfDraftPage(DraftPage draftPage);
 
   /**
    * Retrieves list of page versions by page id and lang
@@ -270,4 +295,12 @@ public interface DataStorage {
    * @param parentPageId Note parent page id
    */
   void deleteOrphanDraftPagesByParentPage(long parentPageId);
+
+  /**
+   * Gets page version by its given id
+   *
+   * @param versionId page version id
+   * @return {@link PageVersion}
+   */
+  PageVersion getPageVersionById(long versionId);
 }

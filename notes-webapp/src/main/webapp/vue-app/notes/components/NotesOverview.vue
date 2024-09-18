@@ -9,119 +9,148 @@
         class="notes-application application-body pa-5"
         ref="content">
         <div class="notes-application-header">
-          <div class="notes-title d-flex justify-space-between pb-4 ps-1">
-            <span
-              ref="noteTitle"
-              class="title text-color mt-n1">
-              {{ noteTitle }}
-            </span>
-            <div
-              id="note-actions-menu"
-              v-show="loadData && !hideElementsForSavingPDF"
-              class="notes-header-icons text-right">
-              <div
-                class="d-inline-flex">
-                <v-tooltip bottom v-if="!isMobile && !hasDraft && isManager">
-                  <template #activator="{ on, attrs }">
-                    <v-btn
-                      v-on="on"
-                      v-bind="attrs"
-                      class="pa-0 mt-0"
-                      @click="addNote"
-                      icon>
-                      <v-icon
-                        size="16"
-                        class="clickable add-note-click">
-                        fas fa-plus
-                      </v-icon>
-                    </v-btn>
-                  </template>
-                  <span class="caption">{{ $t('notes.label.addPage') }}</span>
-                </v-tooltip>
-              </div>
-              <div
-                class="d-inline-flex">
-                <v-tooltip bottom v-if="isManager && !isMobile">
-                  <template #activator="{ on, attrs }">
-                    <v-btn
-                      icon
-                      v-on="on"
-                      v-bind="attrs"
-                      class="pa-0 mt-0"
-                      @click="editNote">
-                      <v-icon
-                        size="16"
-                        class="clickable edit-note-click">
-                        fas fa-edit
-                      </v-icon>
-                    </v-btn>
-                  </template>
-                  <span class="caption">{{ $t('notes.label.editPage') }}</span>
-                </v-tooltip>
-              </div>
-
-              <note-favorite-action
-                :note="note"
-                :activity-id="note.activityId" />
-              <div
-                class="d-inline-flex">
+          <v-row
+            no-gutters
+            class="mb-5">
+            <v-col
+              xl="11"
+              lg="10"
+              md="10"
+              sm="8"
+              cols="6">
+              <div v-if="!hideElementsForSavingPDF" class="notes-treeview d-flex flex-grow-1">
                 <v-tooltip bottom>
                   <template #activator="{ on, attrs }">
                     <v-btn
                       v-on="on"
-                      @click="$root.$emit('display-action-menu')"
                       v-bind="attrs"
-                      class="pa-0 mt-0"
-                      icon>
+                      class="pa-0 me-2"
+                      width="36"
+                      min-width="36"
+                      height="36"
+                      icon
+                      @click="$refs.notesBreadcrumb.open(note, 'displayNote')">
                       <v-icon
-                        size="16"
-                        class="clickable">
-                        fas fa-ellipsis-v
+                        class="icon-default-color"
+                        size="20">
+                        fas fa-sitemap
                       </v-icon>
                     </v-btn>
                   </template>
-                  <span class="caption">{{ $t('notes.label.openMenu') }}</span>
+                  <span class="caption">{{ $t('notes.label.noteTreeview.tooltip') }}</span>
                 </v-tooltip>
+                <note-breadcrumb
+                  class="my-auto"
+                  :note-breadcrumb="notebreadcrumb"
+                  :actual-note-id="note.id"
+                  @open-note="getNoteByName($event, 'breadCrumb', true)" />
               </div>
-            </div>
-          </div>
-          <div v-if="!hideElementsForSavingPDF" class="notes-treeview d-flex flex-inline">
-            <v-tooltip bottom>
-              <template #activator="{ on, attrs }">
-                <v-btn
-                  @click="$refs.notesBreadcrumb.open(note, 'displayNote')"
-                  v-on="on"
-                  class="pa-0"
-                  min-width="24"
-                  v-bind="attrs"
-                  text>
-                  <i
-                    class="uiIcon uiTreeviewIcon primary--text"></i>
-                </v-btn>
-              </template>
-              <span class="caption">{{ $t('notes.label.noteTreeview.tooltip') }}</span>
-            </v-tooltip>
-            <note-breadcrumb
-              class="pt-2 pe-1 pl-1"
-              :note-breadcrumb="notebreadcrumb"
-              :actual-note-id="note.id"
-              @open-note="getNoteByName($event, 'breadCrumb', true)" />
-          </div>
-          <div v-show="!hideElementsForSavingPDF" class="notes-last-update-info">
+            </v-col>
+            <v-col
+              xl="1"
+              lg="2"
+              md="2"
+              sm="4"
+              cols="6">
+              <div
+                id="note-actions-menu"
+                v-show="loadData && !hideElementsForSavingPDF"
+                class="notes-header-icons text-right d-flex justify-end">
+                <div
+                  class="d-inline-flex">
+                  <v-tooltip bottom v-if="!hasDraft && isManager">
+                    <template #activator="{ on, attrs }">
+                      <v-btn
+                        v-on="on"
+                        v-bind="attrs"
+                        class="pa-0 mt-0"
+                        @click="addNote"
+                        icon>
+                        <v-icon
+                          size="20"
+                          class="clickable add-note-click">
+                          fas fa-plus
+                        </v-icon>
+                      </v-btn>
+                    </template>
+                    <span class="caption">{{ $t('notes.label.addPage') }}</span>
+                  </v-tooltip>
+                </div>
+                <div
+                  class="d-inline-flex ms-2">
+                  <v-tooltip bottom v-if="isManager">
+                    <template #activator="{ on, attrs }">
+                      <v-btn
+                        icon
+                        v-on="on"
+                        v-bind="attrs"
+                        class="pa-0 mt-0"
+                        @click="editNote">
+                        <v-icon
+                          size="20"
+                          class="clickable edit-note-click">
+                          fas fa-edit
+                        </v-icon>
+                      </v-btn>
+                    </template>
+                    <span class="caption">{{ $t('notes.label.editPage') }}</span>
+                  </v-tooltip>
+                </div>
+                <note-favorite-action
+                  class="ms-2"
+                  :note="note"
+                  :activity-id="note.activityId" />
+                <div
+                  class="d-inline-flex ms-2">
+                  <v-tooltip bottom>
+                    <template #activator="{ on, attrs }">
+                      <v-btn
+                        v-on="on"
+                        @click="$root.$emit('display-action-menu')"
+                        v-bind="attrs"
+                        class="pa-0 mt-0"
+                        icon>
+                        <v-icon
+                          size="20"
+                          class="clickable">
+                          fas fa-ellipsis-v
+                        </v-icon>
+                      </v-btn>
+                    </template>
+                    <span class="caption">{{ $t('notes.label.openMenu') }}</span>
+                  </v-tooltip>
+                </div>
+              </div>
+            </v-col>
+          </v-row>
+          <v-img
+            v-if="hasFeaturedImage"
+            :lazy-src="featuredImageLink"
+            :alt="featuredImageAltText"
+            :src="featuredImageLink"
+            contain
+            class="mb-5"
+            width="100%"
+            max-height="400" />
+          <div class="notes-title">
+            <span
+              ref="noteTitle"
+              class="title text-color">
+              {{ noteTitle }}
+            </span>
             <notes-translation-menu
               :note="note"
               :translations="translations"
               :selected-translation="selectedTranslation"
               @change-translation="changeTranslation" />
-            <span
-              v-show="lastNoteVersion"
-              class="note-version border-radius primary my-auto px-2 font-weight-bold me-2 caption clickable"
-              @click="openNoteVersionsHistoryDrawer(noteVersions, isManager)">V{{ lastNoteVersion }}</span>
-            <span class="caption text-sub-title font-italic">{{ $t('notes.label.LastModifiedBy', {0: lastNoteUpdatedBy, 1: displayedDate}) }}</span>
           </div>
+          <p
+            v-if="hasSummary"
+            class="note-summary text-sub-title mt-4 mb-0">
+            {{ noteSummary }}
+          </p>
         </div>
-        <v-divider class="my-4" />
-        <div class="note-content" v-if="!hasEmptyContent && !isHomeNoteDefaultContent">
+        <div class="note-content mt-8 my-4" v-if="!hasEmptyContent && !isHomeNoteDefaultContent">
           <div
             class="notes-application-content text-color">
             <component :is="notesContentProcessor" />
@@ -137,7 +166,7 @@
               contain
               eager />
             <div>
-              <p v-if="!isMobile" class="notes-welcome-patragraph">
+              <p class="notes-welcome-patragraph">
                 <span>{{ $t('notes.label.no-content-no-redactor.content.first') }}</span>
                 <v-tooltip bottom>
                   <template #activator="{ on, attrs }">
@@ -230,13 +259,14 @@
       </div>
     </div>
     <notes-actions-menu
+      v-if="!isMobile"
       :note="note"
-      :default-path="defaultPath"
-      @open-treeview="$refs.notesBreadcrumb.open(note, 'movePage')"
-      @export-pdf="createPDF(note)"
-      @open-history="openNoteVersionsHistoryDrawer()"
-      @open-treeview-export="$refs.notesBreadcrumb.open(note.id, 'exportNotes')"
-      @open-import-drawer="$refs.noteImportDrawer.open()" />
+      :default-path="defaultPath" />
+    <notes-mobile-action-menu
+      v-else
+      ref="notesMobileActionMenu"
+      :note="note"
+      :default-path="defaultPath" />
     <note-treeview-drawer
       ref="notesBreadcrumb" />
     <version-history-drawer
@@ -308,6 +338,7 @@ export default {
       noteChildren: [],
       isDraft: false,
       noteTitle: '',
+      noteSummary: '',
       spaceMembersUrl: `${eXo.env.portal.context}/g/:spaces:${eXo.env.portal.spaceGroup}/${eXo.env.portal.spaceUrl}/members`,
       childNodes: [],
       exportStatus: '',
@@ -318,7 +349,9 @@ export default {
       translations: [],
       languages: [],
       slectedLanguage: null,
-      originalVersion: { value: null, text: this.$t('notes.label.translation.originalVersion') },
+      translationsMenu: false,
+      originalVersion: { value: '', text: this.$t('notes.label.translation.originalVersion') },
+      illustrationBaseUrl: `${eXo.env.portal.context}/${eXo.env.portal.rest}/notes/illustration/`,
     };
   },
   watch: {
@@ -332,6 +365,7 @@ export default {
       }
       this.noteTitle = !this.note.parentPageId && this.note.title==='Home' ? `${this.$t('notes.label.noteHome')}` : this.note.title;
       this.noteContent = this.note.content;
+      this.noteSummary = this.note?.properties?.summary;
       this.retrieveNoteTreeById();
     },
     actualVersion() {
@@ -353,6 +387,24 @@ export default {
     }
   },
   computed: {
+    hasSummary() {
+      return this.note?.properties?.summary?.length;
+    },
+    langParam() {
+      return this.note?.lang && `&lang=${this.note?.lang}` || '';
+    },
+    noteFeatureImageUpdatedDate() {
+      return this.note?.properties?.featuredImage?.lastUpdated || 0;
+    },
+    hasFeaturedImage() {
+      return !!this.note?.properties?.featuredImage?.id;
+    },
+    featuredImageAltText() {
+      return this.note?.properties?.featuredImage?.altText;
+    },
+    featuredImageLink() {
+      return `${this.illustrationBaseUrl}${this.note?.id}?v=${this.noteFeatureImageUpdatedDate}&isDraft=${this.isDraft}${this.langParam}&size=0x400`;
+    },
     notesContentProcessor() {
       return {
         template: `<div class='rich-editor-content extended-rich-content'>${this.$noteUtils.getContentToDisplay(this.noteContent, this.note?.id, this.noteBookType, this.noteBookOwner, true)}</div>`,
@@ -423,49 +475,15 @@ export default {
     hasMoreVersions() {
       return this.allNoteVersionsCount > this.versionsPageSize;
     },
-    noteVersionContent() {
-      return this.note.content && this.noteContent && this.$noteUtils.getContentToDisplay(this.noteContent, this.note?.id, this.noteBookType, this.noteBookOwner, true);
-    },
     isHomeNoteDefaultContent() {
       return !this.note.parentPageId && ( this.noteContent===`<h1> Welcome to Space ${this.spaceDisplayName} Notes Home </h1>` || this.noteContent === '');
-    },
-    lastNoteVersion() {
-      return this.noteVersions && this.noteVersions[0] && this.noteVersions[0].versionNumber;
-
-    },
-    NoteTranslations() {
-      return this.translations && this.noteVersions[0] && this.noteVersions[0].versionNumber;
-
-    },
-    lastNoteUpdatedBy() {
-      if (this.isDraft) {
-        return this.note.authorFullName;
-      } else {
-        if (this.displayLastVersion) {
-          return this.noteVersions && this.noteVersions[0] && this.noteVersions[0].authorFullName;
-        } else {
-          return this.actualVersion.authorFullName;
-        }
-      }
     },
     noteAllChildren() {
       return this.noteChildren && this.noteChildren.length && this.noteChildren[0].children;
     },
-    displayedDate() {
-      if (this.isDraft && this.note && this.note.updatedDate && this.note.updatedDate.time) {
-        return this.$dateUtil.formatDateObjectToDisplay(new Date(this.note.updatedDate.time), this.dateTimeFormat, this.lang) || '';
-      } else {
-        if (this.displayLastVersion) {
-          return this.noteVersions && this.noteVersions[0] && this.noteVersions[0].updatedDate.time && this.$dateUtil.formatDateObjectToDisplay(new Date(this.noteVersions[0].updatedDate.time), this.dateTimeFormat, this.lang) || '';
-        } else {
-          return this.$dateUtil.formatDateObjectToDisplay(new Date(this.actualVersion.updatedDate.time), this.dateTimeFormat, this.lang) || '';
-        }
-      }
-    },
     isMobile() {
-      return this.$vuetify.breakpoint.name === 'xs';
+      return this.$vuetify?.breakpoint?.smAndDown;
     },
-
     isAvailableNote() {
       return this.existingNote;
     },
@@ -509,7 +527,7 @@ export default {
     appName() {
       const uris = eXo.env.portal.selectedNodeUri.split('/');
       return uris[uris.length - 1];
-    },
+    }
   },
   created() {
     this.getAvailableLanguages();
@@ -553,6 +571,10 @@ export default {
       this.popStateChange = true;
       this.handleChangePages();
     });
+    this.$root.$on('update-note-title', this.updateNoteTitle);
+    this.$root.$on('update-note-content', this.updateNoteContent);
+    this.$root.$on('update-note-summary', this.updateNoteSummary);
+    this.$root.$on('update-selected-translation', this.updateSelectedTranslation);
     window.addEventListener('message', (event) => {
       if (this.iframelyOriginRegex.exec(event.origin)) {
         const data = JSON.parse(event.data);
@@ -561,20 +583,39 @@ export default {
         }
       }
     });
-    this.$root.$on('update-note-title', this.updateNoteTitle);
-    this.$root.$on('update-note-content', this.updateNoteContent);
-    this.$root.$on('update-selected-translation', this.updateSelectedTranslation);
+
+    this.$root.$on('open-note-treeview', this.openNoteTreeView);
+    this.$root.$on('note-export-pdf', this.createPDF);
+    this.$root.$on('open-note-history', this.openNoteVersionsHistoryDrawer);
+    this.$root.$on('open-note-treeview-export', this.openNoteTreeView);
+    this.$root.$on('open-note-import-drawer', this.openImportDrawer);
 
   },
   mounted() {
     this.handleChangePages();
   },
   methods: {
+    closeMobileActionMenu() {
+      setTimeout(() => {
+        this.$refs.notesMobileActionMenu.close();
+      }, 200);
+    },
+    openNoteTreeView(note, action) {
+      this.$refs.notesBreadcrumb.open(note, action);
+      this.closeMobileActionMenu();
+    },
+    openImportDrawer() {
+      this.$refs.noteImportDrawer.open();
+      this.closeMobileActionMenu();
+    },
     updateNoteTitle(title) {
       this.noteTitle = title;
     },
     updateNoteContent(content) {
       this.noteContent = content;
+    },
+    updateNoteSummary(summary) {
+      this.noteSummary = summary;
     },
     updateSelectedTranslation(translation) {
       this.selectedTranslation = translation;
@@ -835,6 +876,7 @@ export default {
           console.error('Error when exporting note: ', e);
         });
       });
+      this.closeMobileActionMenu();
     },
     displayMessage(message) {
       this.$root.$emit('alert-message', message?.message, message?.type || 'success');
@@ -882,6 +924,7 @@ export default {
         }
         this.$refs.noteVersionsHistoryDrawer.open();
       }
+      this.closeMobileActionMenu();
     },
     retrieveNoteTreeById() {
       this.note.wikiOwner = this.note.wikiOwner.substring(1);

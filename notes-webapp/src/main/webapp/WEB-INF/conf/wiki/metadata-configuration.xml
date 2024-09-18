@@ -46,4 +46,25 @@
         </component-plugin>
     </external-component-plugins>
 
+    <external-component-plugins>
+        <target-component>org.exoplatform.social.metadata.MetadataService</target-component>
+        <component-plugin>
+            <name>NotesMetadataTypePlugin</name>
+            <set-method>addMetadataTypePlugin</set-method>
+            <type>org.exoplatform.social.metadata.MetadataTypePlugin</type>
+            <init-params>
+                <object-param>
+                    <name>metadataType</name>
+                    <object type="org.exoplatform.social.metadata.model.MetadataType">
+                        <field name="id">
+                            <int>1001</int>
+                        </field>
+                        <field name="name">
+                            <string>notes</string>
+                        </field>
+                    </object>
+                </object-param>
+            </init-params>
+        </component-plugin>
+    </external-component-plugins>
 </configuration>

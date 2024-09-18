@@ -22,7 +22,10 @@ package org.exoplatform.wiki.service;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
+import io.meeds.notes.model.NoteFeaturedImage;
+import io.meeds.notes.model.NotePageProperties;
 import org.gatein.api.EntityNotFoundException;
 
 import org.exoplatform.commons.utils.PageList;
@@ -361,9 +364,9 @@ public interface NoteService {
    *
    * @param param Note location params.
    * @param lang draft lang.
-   * @throws WikiException if an error occured
+   * @throws Exception if an error occured
    */
-  void removeDraftOfNote(WikiPageParams param, String lang) throws WikiException;
+  void removeDraftOfNote(WikiPageParams param, String lang) throws Exception;
 
   /**
    * Remove the Drafts of a note
@@ -397,8 +400,9 @@ public interface NoteService {
    *
    * @param draftId Technical Id of the draft page.
    * @throws WikiException if an error occured
+   * @throws Exception 
    */
-  void removeDraftById(String draftId) throws WikiException;
+  void removeDraftById(String draftId) throws Exception;
 
   /**
    * Gets all the Histories of the given note
@@ -466,7 +470,8 @@ public interface NoteService {
    */
   Page updateNote(Page note, PageUpdateType type, Identity userIdentity) throws WikiException,
                                                                          IllegalAccessException,
-                                                                         EntityNotFoundException;
+                                                                         EntityNotFoundException,
+                                                                         Exception;
 
   /**
    * Update the given note. This does not automatically create a new version. If
@@ -532,10 +537,11 @@ public interface NoteService {
    *
    * @param draftNoteToUpdate the draft note to be updated
    * @param currentTimeMillis
+   * @param userIdentityId user identity id
    * @return Updated draft
    * @throws WikiException
    */
-  DraftPage updateDraftForNewPage(DraftPage draftNoteToUpdate, long currentTimeMillis) throws WikiException;
+  DraftPage updateDraftForNewPage(DraftPage draftNoteToUpdate, long currentTimeMillis, long userIdentityId) throws WikiException;
 
   /**
    * Creates a draft for an existing page
@@ -560,10 +566,11 @@ public interface NoteService {
    *
    * @param draftNoteToSave The draft note to be created
    * @param currentTimeMillis
+   * @param userIdentityId user identity id
    * @return Created draft
    * @throws WikiException
    */
-  DraftPage createDraftForNewPage(DraftPage draftNoteToSave, long currentTimeMillis) throws WikiException;
+  DraftPage createDraftForNewPage(DraftPage draftNoteToSave, long currentTimeMillis, long userIdentityId) throws WikiException;
 
   /**
    * Return the list of children of the note to export
@@ -618,7 +625,7 @@ public interface NoteService {
    */
   void importNotes(String zipLocation, Page parent, String conflict, Identity userIdentity) throws WikiException,
                                                                                             IllegalAccessException,
-                                                                                            IOException;
+                                                                                            IOException, Exception;
 
   /**
    * Import Notes from a list of files
@@ -635,7 +642,7 @@ public interface NoteService {
    */
   void importNotes(List<String> files, Page parent, String conflict, Identity userIdentity) throws WikiException,
                                                                                             IllegalAccessException,
-                                                                                            IOException;
+                                                                                            IOException, Exception;
 
   /**
    * Searches in all wiki pages.
@@ -752,7 +759,7 @@ public interface NoteService {
    * @param lang language.
    * @throws WikiException if an error occured
    */
-  void deleteVersionsByNoteIdAndLang(Long noteId, String lang) throws WikiException;
+  void deleteVersionsByNoteIdAndLang(Long noteId, String lang) throws Exception;
 
   /**
    * Deletes a list of versions of note by language.
@@ -764,7 +771,7 @@ public interface NoteService {
    */
   @Deprecated
   // Use {@link deleteVersionsByNoteIdAndLang(Long noteId, String lang)} instead
-  void deleteVersionsByNoteIdAndLang(Long noteId, String username, String lang) throws WikiException;
+  void deleteVersionsByNoteIdAndLang(Long noteId, String username, String lang) throws Exception;
 
 
   /**
@@ -773,4 +780,60 @@ public interface NoteService {
    * @param parentPageId Note parent page id
    */
   void removeOrphanDraftPagesByParentPage(long parentPageId);
+
+  /**
+   * Saves Note featured Image
+   *
+   * @param note target note page
+   * @param featuredImage Note featured image
+   * @return saved featured image ID
+   */
+  Long saveNoteFeaturedImage(Page note, NoteFeaturedImage featuredImage) throws Exception;
+
+  /**
+   * Get Note featured Image by its given id
+   *
+   * @param noteId Note id
+   * @param lang note version language
+   * @param isDraft is target not a draft
+   * @param thumbnailSize featured image thumbnail size
+   * @param userIdentityId user identity id
+   * @return {@link NoteFeaturedImage}
+   */
+  NoteFeaturedImage getNoteFeaturedImageInfo(Long noteId, String lang, boolean isDraft, String thumbnailSize, long userIdentityId) throws Exception;
+
+  /**
+   * Save note metadata properties
+   *
+   * @param pageProperties note metadata properties to save
+   * @param lang target version language
+   * @param userIdentityId user identity id
+   * @return {@link NotePageProperties}                      
+   */
+  NotePageProperties saveNoteMetadata(NotePageProperties pageProperties, String lang, Long userIdentityId) throws Exception;
+
+  /**
+   * Removes note featured image and its related metadata property
+   *
+   * @param noteId target note id
+   * @param featuredImageId featured image id
+   * @param lang target version language
+   * @param isDraft is the target note a draft
+   * @param userIdentityId user identity id
+   * @throws Exception
+   */
+  void removeNoteFeaturedImage(Long noteId, Long featuredImageId, String lang, boolean isDraft, Long userIdentityId) throws Exception;
+
+  /**
+   * Gets page version by its given id
+   *
+   * @param versionId page version id
+   * @return {@link PageVersion}
+   */
+  PageVersion getPageVersionById(Long versionId);
+
+  /**
+   * {@inheritDoc}
+   */
+  DraftPage getDraftOfPageByLang(WikiPageParams param, String lang) throws WikiException;
 }

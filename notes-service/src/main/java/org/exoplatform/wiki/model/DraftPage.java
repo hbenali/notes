@@ -25,13 +25,13 @@ import lombok.Data;
 
 @Data
 public class DraftPage extends Page {
-  private String     targetPageId;
+  private String              targetPageId;
 
-  private String     targetPageRevision;
+  private String              targetPageRevision;
 
-  private boolean    newPage;
+  private boolean             newPage;
 
-  private DiffResult changes;
+  private DiffResult          changes;
 
   @Override
   public boolean isDraftPage() {

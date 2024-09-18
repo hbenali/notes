@@ -20,8 +20,7 @@
 
 package org.exoplatform.wiki.service.impl;
 
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.file.Files;
@@ -37,13 +36,20 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Matcher;
 
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.exoplatform.wiki.jpa.entity.DraftPageEntity;
 import org.gatein.api.EntityNotFoundException;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import org.exoplatform.commons.exception.ObjectNotFoundException;
+import org.exoplatform.commons.file.model.FileInfo;
+import org.exoplatform.commons.file.model.FileItem;
+import org.exoplatform.commons.file.services.FileService;
 import org.exoplatform.commons.utils.CommonsUtils;
 import org.exoplatform.commons.utils.ObjectPageList;
 import org.exoplatform.commons.utils.PageList;
@@ -52,10 +58,8 @@ import org.exoplatform.services.cache.ExoCache;
 import org.exoplatform.services.listener.ListenerService;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
-import org.exoplatform.services.organization.OrganizationService;
 import org.exoplatform.services.security.Identity;
 import org.exoplatform.services.security.IdentityConstants;
-import org.exoplatform.services.security.IdentityRegistry;
 import org.exoplatform.social.common.service.HTMLUploadImageProcessor;
 import org.exoplatform.social.core.identity.provider.OrganizationIdentityProvider;
 import org.exoplatform.social.core.manager.IdentityManager;
@@ -63,7 +67,12 @@ import org.exoplatform.social.core.space.model.Space;
 import org.exoplatform.social.core.space.spi.SpaceService;
 import org.exoplatform.social.metadata.MetadataService;
 import org.exoplatform.social.metadata.model.MetadataItem;
+import org.exoplatform.social.metadata.model.MetadataKey;
 import org.exoplatform.social.metadata.model.MetadataObject;
+import org.exoplatform.social.metadata.model.MetadataType;
+import org.exoplatform.services.thumbnail.ImageThumbnailService;
+import org.exoplatform.upload.UploadResource;
+import org.exoplatform.upload.UploadService;
 import org.exoplatform.wiki.WikiException;
 import org.exoplatform.wiki.model.DraftPage;
 import org.exoplatform.wiki.model.ImportList;
@@ -90,21 +99,49 @@ import org.exoplatform.wiki.service.search.WikiSearchData;
 import org.exoplatform.wiki.utils.NoteConstants;
 import org.exoplatform.wiki.utils.Utils;
 
+import io.meeds.notes.model.NoteFeaturedImage;
+import io.meeds.notes.model.NoteMetadataObject;
+import io.meeds.notes.model.NotePageProperties;
 import io.meeds.notes.service.NotePageViewService;
 import io.meeds.social.cms.service.CMSService;
 import lombok.SneakyThrows;
 
 public class NoteServiceImpl implements NoteService {
 
-  public static final String                              CACHE_NAME          = "wiki.PageRenderingCache";
+  public static final String                              CACHE_NAME                             = "wiki.PageRenderingCache";
 
-  public static final String                              ATT_CACHE_NAME      = "wiki.PageAttachmentCache";
+  public static final String                              ATT_CACHE_NAME                         = "wiki.PageAttachmentCache";
 
-  private static final String                             UNTITLED_PREFIX     = "Untitled_";
+  private static final String                             UNTITLED_PREFIX                        = "Untitled_";
 
-  private static final String                             TEMP_DIRECTORY_PATH = "java.io.tmpdir";
+  private static final String                             TEMP_DIRECTORY_PATH                    = "java.io.tmpdir";
 
-  private static final Log                                log                 = ExoLogger.getLogger(NoteServiceImpl.class);
+  private static final String                             FILE_NAME_SPACE                        = "wiki";
+
+  private static final Log                                log                                    =
+                                                              ExoLogger.getLogger(NoteServiceImpl.class);
+
+  private static final MetadataType                       NOTES_METADATA_TYPE                    =
+                                                                              new MetadataType(1001, "notes");
+
+  private static final MetadataKey                        NOTES_METADATA_KEY                     =
+                                                                             new MetadataKey(NOTES_METADATA_TYPE.getName(),
+                                                                                             Utils.NOTES_METADATA_OBJECT_TYPE,
+                                                                                             0);
+
+  public static final String                              NOTE_METADATA_PAGE_OBJECT_TYPE         = "notePage";
+
+  public static final String                              NOTE_METADATA_DRAFT_PAGE_OBJECT_TYPE   = "noteDraftPage";
+
+  public static final String                              NOTE_METADATA_VERSION_PAGE_OBJECT_TYPE = "noteVersionPage";
+
+  public static final String                              SUMMARY_PROP                           = "summary";
+
+  public static final String                              FEATURED_IMAGE_ID                      = "featuredImageId";
+
+  public static final String                              FEATURED_IMAGE_UPDATED_DATE            = "featuredImageUpdatedDate";
+
+  public static final String                              FEATURED_IMAGE_ALT_TEXT                = "featuredImageAltText";
 
   private final WikiService                               wikiService;
 
@@ -114,7 +151,7 @@ public class NoteServiceImpl implements NoteService {
 
   private final ExoCache<Integer, AttachmentCountData>    attachmentCountCache;
 
-  private final Map<WikiPageParams, List<WikiPageParams>> pageLinksMap        = new ConcurrentHashMap<>();
+  private final Map<WikiPageParams, List<WikiPageParams>> pageLinksMap                           = new ConcurrentHashMap<>();
 
   private final IdentityManager                           identityManager;
 
@@ -122,23 +159,29 @@ public class NoteServiceImpl implements NoteService {
 
   private final CMSService                                cmsService;
 
-  private final IdentityRegistry                          identityRegistry;
-
-  private final OrganizationService                       organizationService;
-
   private final ListenerService                           listenerService;
+  
+  private final FileService                               fileService;
+
+  private final UploadService                             uploadService;
+  
+  private final MetadataService                           metadataService;
+  
+  private final ImageThumbnailService                     imageThumbnailService;
 
   private final HTMLUploadImageProcessor                  htmlUploadImageProcessor;
 
-  public NoteServiceImpl( DataStorage dataStorage,
-                          CacheService cacheService,
-                          WikiService wikiService,
-                          IdentityManager identityManager,
-                          SpaceService spaceService,
-                          CMSService cmsService,
-                          IdentityRegistry identityRegistry,
-                          OrganizationService organizationService,
-                          ListenerService listenerService) {
+  public NoteServiceImpl(DataStorage dataStorage,
+                         CacheService cacheService,
+                         WikiService wikiService,
+                         IdentityManager identityManager,
+                         SpaceService spaceService,
+                         CMSService cmsService,
+                         ListenerService listenerService,
+                         FileService fileService,
+                         UploadService uploadService,
+                         MetadataService metadataService,
+                         ImageThumbnailService imageThumbnailService) {
     this.dataStorage = dataStorage;
     this.wikiService = wikiService;
     this.identityManager = identityManager;
@@ -147,8 +190,10 @@ public class NoteServiceImpl implements NoteService {
     this.spaceService = spaceService;
     this.listenerService = listenerService;
     this.cmsService = cmsService;
-    this.identityRegistry = identityRegistry;
-    this.organizationService = organizationService;
+    this.fileService = fileService;
+    this.uploadService = uploadService;
+    this.metadataService = metadataService;
+    this.imageThumbnailService = imageThumbnailService;
     this.htmlUploadImageProcessor = null;
   }
 
@@ -158,9 +203,11 @@ public class NoteServiceImpl implements NoteService {
                          IdentityManager identityManager,
                          SpaceService spaceService,
                          CMSService cmsService,
-                         IdentityRegistry identityRegistry,
-                         OrganizationService organizationService,
                          ListenerService listenerService,
+                         FileService fileService,
+                         UploadService uploadService,
+                         MetadataService metadataService,
+                         ImageThumbnailService imageThumbnailService,
                          HTMLUploadImageProcessor htmlUploadImageProcessor) {
     this.dataStorage = dataStorage;
     this.wikiService = wikiService;
@@ -170,8 +217,10 @@ public class NoteServiceImpl implements NoteService {
     this.spaceService = spaceService;
     this.listenerService = listenerService;
     this.cmsService = cmsService;
-    this.identityRegistry = identityRegistry;
-    this.organizationService = organizationService;
+    this.fileService = fileService;
+    this.uploadService = uploadService;
+    this.metadataService = metadataService;
+    this.imageThumbnailService = imageThumbnailService;
     this.htmlUploadImageProcessor = htmlUploadImageProcessor;
   }
 
@@ -199,11 +248,25 @@ public class NoteServiceImpl implements NoteService {
       note.setAuthor(userIdentity.getUserId());
       note.setContent(note.getContent());
       Page createdPage = createNote(noteBook, parentPage, note);
-
-      Space space = spaceService.getSpaceByGroupId(note.getWikiOwner());
-      createdPage.setCanManage(Utils.canManageNotes(note.getAuthor(), space, note));
-      createdPage.setCanImport(canImportNotes(note.getAuthor(), space, note));
-      createdPage.setCanView(canViewNotes(note.getAuthor(), space, note));
+      NotePageProperties properties = note.getProperties();
+      try {
+        if (properties != null) {
+          properties.setNoteId(Long.parseLong(createdPage.getId()));
+          properties.setDraft(false);
+          properties = saveNoteMetadata(properties,
+                                        note.getLang(),
+                                        Long.valueOf(identityManager.getOrCreateUserIdentity(userIdentity.getUserId()).getId()));
+        }
+      } catch (Exception e) {
+        log.error("Failed to save note metadata", e);
+      }
+      if (createdPage != null) {
+        createdPage.setProperties(properties);
+        Space space = spaceService.getSpaceByGroupId(note.getWikiOwner());
+        createdPage.setCanManage(Utils.canManageNotes(note.getAuthor(), space, note));
+        createdPage.setCanImport(canImportNotes(note.getAuthor(), space, note));
+        createdPage.setCanView(canViewNotes(note.getAuthor(), space, note));
+      }
       return createdPage;
     } else {
       throw new EntityNotFoundException("Parent note not found");
@@ -228,6 +291,10 @@ public class NoteServiceImpl implements NoteService {
 
     Utils.broadcast(listenerService, "note.posted", note.getAuthor(), createdPage);
     postAddPage(noteBook.getType(), noteBook.getOwner(), note.getName(), createdPage);
+    Matcher mentionMatcher = Utils.MENTION_PATTERN.matcher(createdPage.getContent());
+    if (mentionMatcher.find()) {
+      Utils.sendMentionInNoteNotification(createdPage, null, createdPage.getAuthor());
+    }
     return createdPage;
   }
 
@@ -246,7 +313,8 @@ public class NoteServiceImpl implements NoteService {
   @Override
   public Page updateNote(Page note, PageUpdateType type, Identity userIdentity) throws WikiException,
                                                                                 IllegalAccessException,
-                                                                                EntityNotFoundException {
+                                                                                EntityNotFoundException,
+                                                                                Exception {
     Page existingNote = getNoteById(note.getId());
     if (existingNote == null) {
       throw new EntityNotFoundException("Note to update not found");
@@ -255,11 +323,25 @@ public class NoteServiceImpl implements NoteService {
     if (userIdentity != null && !Utils.canManageNotes(userIdentity.getUserId(), space, existingNote)) {
       throw new IllegalAccessException("User does not have edit the note.");
     }
-    if (PageUpdateType.EDIT_PAGE_CONTENT.equals(type) || PageUpdateType.EDIT_PAGE_CONTENT_AND_TITLE.equals(type)) {
+    if (PageUpdateType.EDIT_PAGE_CONTENT.equals(type) || PageUpdateType.EDIT_PAGE_CONTENT_AND_TITLE.equals(type)
+        || PageUpdateType.EDIT_PAGE_PROPERTIES.equals(type)) {
       note.setUpdatedDate(Calendar.getInstance().getTime());
     }
     note.setContent(note.getContent());
     Page updatedPage = dataStorage.updatePage(note);
+    NotePageProperties properties = note.getProperties();
+    if (userIdentity != null && properties != null) {
+      try {
+        properties.setNoteId(Long.parseLong(updatedPage.getId()));
+        properties.setDraft(false);
+        properties = saveNoteMetadata(note.getProperties(),
+                                      note.getLang(),
+                                      Long.valueOf(identityManager.getOrCreateUserIdentity(userIdentity.getUserId()).getId()));
+        updatedPage.setProperties(properties);
+      } catch (Exception e) {
+        log.error("Error while updating note metadata properties", e);
+      }
+    }
     invalidateCache(note);
 
     updatedPage.setUrl(Utils.getPageUrl(updatedPage));
@@ -273,9 +355,14 @@ public class NoteServiceImpl implements NoteService {
       updatedPage.setMetadatas(metadata);
       note.setAuthor(userIdentity.getUserId());
     }
+
+    Matcher mentionsMatcher = Utils.MENTION_PATTERN.matcher(note.getContent());
+    if (mentionsMatcher.find()) {
+      Utils.sendMentionInNoteNotification(note, existingNote, userIdentity != null ? userIdentity.getUserId() : existingNote.getAuthor());
+    }
     Utils.broadcast(listenerService, "note.updated", note.getAuthor(), updatedPage);
     postUpdatePage(updatedPage.getWikiType(), updatedPage.getWikiOwner(), updatedPage.getName(), updatedPage, type);
-
+    updatedPage.setLang(note.getLang());
     return updatedPage;
   }
 
@@ -349,7 +436,6 @@ public class NoteServiceImpl implements NoteService {
         }
 
         deleteNote(noteType, noteOwner, noteName);
-
         postDeletePage(noteType, noteOwner, noteName, note);
 
         // Post delete activity for all children pages
@@ -815,16 +901,38 @@ public class NoteServiceImpl implements NoteService {
    */
   @Override
   public void removeDraftOfNote(Page page) throws WikiException {
+    List<DraftPage> draftPages = dataStorage.getDraftsOfPage(Long.valueOf(page.getId()));
+    for (DraftPage draftPage : draftPages) {
+      if (draftPage != null) {
+        dataStorage.deleteAttachmentsOfDraftPage(draftPage);
+        try {
+          deleteNoteMetadataProperties(draftPage, draftPage.getLang(), NOTE_METADATA_DRAFT_PAGE_OBJECT_TYPE);
+        } catch (Exception e) {
+          log.error("Error while deleting draft properties");
+        }
+      }
+    }
     dataStorage.deleteDraftOfPage(page);
+  }
+  
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public DraftPage getDraftOfPageByLang(WikiPageParams param, String lang) throws WikiException {
+    Page page = getNoteOfNoteBookByName(param.getType(), param.getOwner(), param.getPageName());
+    return dataStorage.getDraftOfPageByLang(page, lang);
   }
 
   /**
    * {@inheritDoc}
    */
   @Override
-  public void removeDraftOfNote(WikiPageParams param, String lang) throws WikiException {
-    Page page = getNoteOfNoteBookByName(param.getType(), param.getOwner(), param.getPageName());
-    dataStorage.deleteDraftOfPage(page, lang);
+  public void removeDraftOfNote(WikiPageParams param, String lang) throws Exception {
+    DraftPage draftPage = getDraftOfPageByLang(param, lang);
+    if (draftPage != null) {
+      removeDraftById(draftPage.getId());
+    }
   }
 
   /**
@@ -839,10 +947,12 @@ public class NoteServiceImpl implements NoteService {
    * {@inheritDoc}
    */
   @Override
-  public void removeDraftById(String draftId) throws WikiException {
+  public void removeDraftById(String draftId) throws Exception {
+    DraftPage draftNote = dataStorage.getDraftPageById(draftId);
+    deleteNoteMetadataProperties(draftNote, draftNote.getLang(), NOTE_METADATA_DRAFT_PAGE_OBJECT_TYPE);
     dataStorage.deleteDraftById(draftId);
   }
-  
+
   /**
    * {@inheritDoc}
    */
@@ -850,7 +960,15 @@ public class NoteServiceImpl implements NoteService {
   public List<PageHistory> getVersionsHistoryOfNote(Page note, String userName) throws WikiException {
     List<PageHistory> versionsHistory = dataStorage.getHistoryOfPage(note);
     if (versionsHistory == null || versionsHistory.isEmpty()) {
-      dataStorage.addPageVersion(note, userName);
+      PageVersion pageVersion = dataStorage.addPageVersion(note, userName);
+      pageVersion.setId(note.getId() + "-" + pageVersion.getName());
+      copyNotePageProperties(note,
+                             pageVersion,
+                             note.getLang(),
+                             null,
+                             NOTE_METADATA_PAGE_OBJECT_TYPE,
+                             NOTE_METADATA_VERSION_PAGE_OBJECT_TYPE,
+                             userName);
       versionsHistory = dataStorage.getHistoryOfPage(note);
     }
     for (PageHistory version : versionsHistory) {
@@ -869,10 +987,30 @@ public class NoteServiceImpl implements NoteService {
    */
   @Override
   public void createVersionOfNote(Page note, String userName) throws WikiException {
-    dataStorage.addPageVersion(note, userName);
+    PageVersion pageVersion = dataStorage.addPageVersion(note, userName);
     if (note.getLang() != null) {
-      String versionLandId =  note.getId() + "-" + note.getLang();
-      postUpdatePageVersionLanguage(versionLandId);
+      try {
+        NotePageProperties properties = note.getProperties();
+        if (properties != null) {
+          properties.setNoteId(Long.parseLong(note.getId()));
+          properties.setDraft(false);
+          saveNoteMetadata(properties, note.getLang(), Long.valueOf(identityManager.getOrCreateUserIdentity(userName).getId()));
+        }
+      } catch (Exception e) {
+        log.error("Error while saving note version language metadata", e);
+      }
+      String versionLangId = note.getId() + "-" + note.getLang();
+      postUpdatePageVersionLanguage(versionLangId);
+    } else {
+      pageVersion.setId(note.getId() + "-" + pageVersion.getName());
+      copyNotePageProperties(note,
+                             pageVersion,
+                             note.getLang(),
+                             null,
+                             NOTE_METADATA_PAGE_OBJECT_TYPE,
+                             NOTE_METADATA_VERSION_PAGE_OBJECT_TYPE,
+                             userName
+      );
     }
   }
 
@@ -881,7 +1019,15 @@ public class NoteServiceImpl implements NoteService {
    */
   @Override
   public void restoreVersionOfNote(String versionName, Page note, String userName) throws WikiException {
-    dataStorage.restoreVersionOfPage(versionName, note);
+    PageVersion pageVersion = dataStorage.restoreVersionOfPage(versionName, note);
+    pageVersion.setId(note.getId() + "-" + pageVersion.getName());
+    copyNotePageProperties(pageVersion,
+                           note,
+                           null,
+                           null,
+                           NOTE_METADATA_VERSION_PAGE_OBJECT_TYPE,
+                           NOTE_METADATA_PAGE_OBJECT_TYPE,
+                           userName);
     createVersionOfNote(note, userName);
     invalidateCache(note);
   }
@@ -944,9 +1090,23 @@ public class NoteServiceImpl implements NoteService {
     } else {
       newDraftPage.setTargetPageRevision(revision);
     }
-
     newDraftPage = dataStorage.updateDraftPageForUser(newDraftPage, Utils.getCurrentUser());
-
+    NotePageProperties properties = draftNoteToUpdate.getProperties();
+    try {
+      if (properties != null) {
+        NoteFeaturedImage featuredImage = properties.getFeaturedImage();
+        if (featuredImage != null && featuredImage.getUploadId() != null
+            && isOriginalFeaturedImage(draftNoteToUpdate, targetPage)) {
+          featuredImage.setId(0L);
+        }
+        properties = saveNoteMetadata(properties,
+                                      newDraftPage.getLang(),
+                                      Long.valueOf(identityManager.getOrCreateUserIdentity(username).getId()));
+      }
+    } catch (Exception e) {
+      log.error("Failed to save draft note metadata", e);
+    }
+    newDraftPage.setProperties(properties);
     return newDraftPage;
   }
 
@@ -954,7 +1114,7 @@ public class NoteServiceImpl implements NoteService {
    * {@inheritDoc}
    */
   @Override
-  public DraftPage updateDraftForNewPage(DraftPage draftNoteToUpdate, long clientTime) throws WikiException {
+  public DraftPage updateDraftForNewPage(DraftPage draftNoteToUpdate, long clientTime, long userIdentityId) throws WikiException {
     // Create suffix for draft name
     String draftSuffix = getDraftNameSuffix(clientTime);
 
@@ -973,7 +1133,13 @@ public class NoteServiceImpl implements NoteService {
     newDraftPage.setUpdatedDate(new Date(clientTime));
 
     newDraftPage = dataStorage.updateDraftPageForUser(newDraftPage, Utils.getCurrentUser());
-
+    NotePageProperties properties = draftNoteToUpdate.getProperties();
+    try {
+      properties = saveNoteMetadata(properties, newDraftPage.getLang(), userIdentityId);
+    } catch (Exception e) {
+      log.error("Failed to save draft note metadata", e);
+    }
+    newDraftPage.setProperties(properties);
     return newDraftPage;
   }
 
@@ -1010,9 +1176,23 @@ public class NoteServiceImpl implements NoteService {
     } else {
       newDraftPage.setTargetPageRevision(revision);
     }
-
     newDraftPage = dataStorage.createDraftPageForUser(newDraftPage, username);
-
+    NotePageProperties properties = draftPage.getProperties();
+    try {
+      if (properties != null) {
+        NoteFeaturedImage featuredImage = properties.getFeaturedImage();
+        if (featuredImage != null && featuredImage.getUploadId() != null) {
+          featuredImage.setId(0L);
+        }
+        properties.setNoteId(Long.parseLong(newDraftPage.getId()));
+        properties = saveNoteMetadata(properties,
+                                      draftPage.getLang(),
+                                      Long.valueOf(identityManager.getOrCreateUserIdentity(username).getId()));
+      }
+    } catch (Exception e) {
+      log.error("Failed to save draft note metadata", e);
+    }
+    newDraftPage.setProperties(properties);
     return newDraftPage;
   }
 
@@ -1020,7 +1200,7 @@ public class NoteServiceImpl implements NoteService {
    * {@inheritDoc}
    */
   @Override
-  public DraftPage createDraftForNewPage(DraftPage draftPage, long clientTime) throws WikiException {
+  public DraftPage createDraftForNewPage(DraftPage draftPage, long clientTime, long userIdentityId) throws WikiException {
     // Create suffix for draft name
     String draftSuffix = getDraftNameSuffix(clientTime);
 
@@ -1037,9 +1217,17 @@ public class NoteServiceImpl implements NoteService {
     newDraftPage.setSyntax(draftPage.getSyntax());
     newDraftPage.setCreatedDate(new Date(clientTime));
     newDraftPage.setUpdatedDate(new Date(clientTime));
-
     newDraftPage = dataStorage.createDraftPageForUser(newDraftPage, Utils.getCurrentUser());
-
+    NotePageProperties properties = draftPage.getProperties();
+    try {
+      if (properties != null) {
+        properties.setNoteId(Long.parseLong(newDraftPage.getId()));
+        properties = saveNoteMetadata(properties, draftPage.getLang(), userIdentityId);
+      }
+    } catch (Exception e) {
+      log.error("Failed to save draft note metadata", e);
+    }
+    newDraftPage.setProperties(properties);
     return newDraftPage;
   }
   
@@ -1091,7 +1279,7 @@ public class NoteServiceImpl implements NoteService {
   @Override
   public void importNotes(String zipLocation, Page parent, String conflict, Identity userIdentity) throws WikiException,
           IllegalAccessException,
-          IOException {
+          IOException, Exception {
     List<String> files = Utils.unzip(zipLocation, System.getProperty(TEMP_DIRECTORY_PATH));
     importNotes(files, parent, conflict, userIdentity);
   }
@@ -1102,7 +1290,7 @@ public class NoteServiceImpl implements NoteService {
   @Override
   public void importNotes(List<String> files, Page parent, String conflict, Identity userIdentity) throws WikiException,
           IllegalAccessException,
-          IOException {
+          IOException, Exception {
 
     String notesFilePath = "";
     for (String file : files) {
@@ -1197,6 +1385,7 @@ public class NoteServiceImpl implements NoteService {
       page.setTitle(publishedVersion.getTitle());
       page.setContent(publishedVersion.getContent());
       page.setLang(publishedVersion.getLang());
+      page.setProperties(publishedVersion.getProperties());
       if (lang != null) {
         page.setMetadatas(retrieveMetadataItems(pageId + "-" + lang, userIdentity.getUserId()));
       }
@@ -1256,7 +1445,15 @@ public class NoteServiceImpl implements NoteService {
   public List<PageHistory> getVersionsHistoryOfNoteByLang(Page note, String userName, String lang) throws WikiException {
     List<PageHistory> pageHistories = dataStorage.getPageHistoryVersionsByPageIdAndLang(Long.valueOf(note.getId()), lang);
     if (lang == null && pageHistories.isEmpty()) {
-      dataStorage.addPageVersion(note, userName);
+      PageVersion pageVersion =  dataStorage.addPageVersion(note, userName);
+      pageVersion.setId(note.getId() + "-" + pageVersion.getName());
+      copyNotePageProperties(note,
+                             pageVersion,
+                             note.getLang(),
+                             null,
+                             NOTE_METADATA_PAGE_OBJECT_TYPE,
+                             NOTE_METADATA_VERSION_PAGE_OBJECT_TYPE,
+                             userName);
       pageHistories = dataStorage.getPageHistoryVersionsByPageIdAndLang(Long.valueOf(note.getId()), null);
     }
     return pageHistories;
@@ -1282,22 +1479,46 @@ public class NoteServiceImpl implements NoteService {
    * {@inheritDoc}
    */
   @Override
-  public void deleteVersionsByNoteIdAndLang(Long noteId, String lang) throws WikiException {
+  public void deleteVersionsByNoteIdAndLang(Long noteId, String lang) throws Exception {
+    Page note = getNoteById(String.valueOf(noteId));
+    if (note != null) {
+      deleteNoteMetadataProperties(note, lang, NOTE_METADATA_PAGE_OBJECT_TYPE);
+    }
     dataStorage.deleteVersionsByNoteIdAndLang(noteId, lang);
     List<DraftPage> drafts = dataStorage.getDraftsOfPage(noteId);
     for (DraftPage draftPage : drafts) {
       if (StringUtils.equals(draftPage.getLang(),lang)) {
-        removeDraft(draftPage.getName());
+        removeDraftById(draftPage.getId());
       }
     }
     postDeletePageVersionLanguage(noteId + "-" + lang);
   }
 
+  private void deleteNoteMetadataProperties(Page note, String lang, String objectType) throws Exception {
+    MetadataItem draftNoteMetadataItem = getNoteMetadataItem(note, lang, objectType);
+    if (draftNoteMetadataItem != null) {
+      Map<String, String> properties = draftNoteMetadataItem.getProperties();
+      if (properties != null && properties.getOrDefault(FEATURED_IMAGE_ID, null) != null) {
+        String featuredImageId = properties.get(FEATURED_IMAGE_ID);
+        if (note.isDraftPage() && ((DraftPage) note).getTargetPageId() != null) {
+          removeNoteFeaturedImage(Long.parseLong(note.getId()),
+                                  Long.parseLong(featuredImageId),
+                                  lang,
+                                  true,
+                                  Long.parseLong(identityManager.getOrCreateUserIdentity(note.getOwner()).getId()));
+        } else {
+          fileService.deleteFile(Long.parseLong(featuredImageId));
+        }
+      }
+      metadataService.deleteMetadataItem(draftNoteMetadataItem.getId(), false);
+    }
+  }
+  
   /**
    * {@inheritDoc}
    */
   @Override
-  public void deleteVersionsByNoteIdAndLang(Long noteId, String userName, String lang) throws WikiException {
+  public void deleteVersionsByNoteIdAndLang(Long noteId, String userName, String lang) throws Exception {
     deleteVersionsByNoteIdAndLang(noteId, lang);
   }
   
@@ -1476,7 +1697,7 @@ public class NoteServiceImpl implements NoteService {
   /******* Private methods *******/
   
   private void importNote(Page note, Page parent, Wiki wiki, String conflict, Identity userIdentity) throws WikiException,
-                                                                                                    IllegalAccessException {
+                                                                                                    IllegalAccessException, Exception {
 
     Page parent_ = getNoteOfNoteBookByName(wiki.getType(), wiki.getOwner(), parent.getName());
     if (parent_ == null) {
@@ -1757,7 +1978,6 @@ public class NoteServiceImpl implements NoteService {
                                                                         identityManager.getOrCreateIdentity(OrganizationIdentityProvider.NAME,
                                                                                                             username);
     long currentUserId = Long.parseLong(currentIdentity.getId());
-    MetadataService metadataService = CommonsUtils.getService(MetadataService.class);
     MetadataObject metadataObject = new MetadataObject(Utils.NOTES_METADATA_OBJECT_TYPE, noteId);
     List<MetadataItem> metadataItems = metadataService.getMetadataItemsByObject(metadataObject);
     Map<String, List<MetadataItem>> metadata = new HashMap<>();
@@ -1778,5 +1998,276 @@ public class NoteServiceImpl implements NoteService {
   @Override
   public void removeOrphanDraftPagesByParentPage(long parentPageId) {
     dataStorage.deleteOrphanDraftPagesByParentPage(parentPageId);
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public Long saveNoteFeaturedImage(Page note, NoteFeaturedImage featuredImage) throws Exception {
+    if (featuredImage == null) {
+      return null;
+    }
+    long featuredImageId = featuredImage.getId() != null ? featuredImage.getId(): 0L;
+    String uploadId = featuredImage.getUploadId();
+    if (uploadId != null) {
+      
+      UploadResource uploadResource = uploadService.getUploadResource(uploadId);
+      if (uploadResource != null) {
+        String fileDiskLocation = uploadResource.getStoreLocation();
+        try (InputStream inputStream = new FileInputStream(fileDiskLocation);) {
+          FileItem fileItem = new FileItem(featuredImageId,
+                                           note.getName(),
+                                           featuredImage.getMimeType(),
+                                           FILE_NAME_SPACE,
+                                           inputStream.available(),
+                                           new Date(),
+                                           null,
+                                           false,
+                                           inputStream);
+          if (featuredImageId == 0) {
+            fileItem = fileService.writeFile(fileItem);
+          } else {
+            fileItem = fileService.updateFile(fileItem);
+          }
+          if (fileItem != null && fileItem.getFileInfo() != null) {
+            return fileItem.getFileInfo().getId();
+          }
+        } catch (Exception e) {
+          log.error("Error while saving note featured image", e);
+        } finally {
+          uploadService.removeUploadResource(uploadId);
+        }
+      }
+    }
+    return featuredImageId;
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public NoteFeaturedImage getNoteFeaturedImageInfo(Long noteId, String lang, boolean isDraft, String thumbnailSize, long userIdentityId) throws Exception {
+    if (noteId == null) {
+      throw new IllegalArgumentException("note id is mandatory");
+    }
+    Page note;
+    org.exoplatform.social.core.identity.model.Identity identity = identityManager.getIdentity(String.valueOf(userIdentityId));
+    if (isDraft) {
+      note = getDraftNoteById(String.valueOf(noteId), identity.getRemoteId());
+    } else {
+      note = getNoteByIdAndLang(noteId, lang);
+    }
+    if (note == null) {
+      throw new ObjectNotFoundException("Note with id: " + noteId + " and lang: " + lang + " not found");
+    }
+
+    MetadataItem metadataItem = getNoteMetadataItem(note,
+                                                    lang,
+                                                    isDraft ? NOTE_METADATA_DRAFT_PAGE_OBJECT_TYPE
+                                                            : NOTE_METADATA_PAGE_OBJECT_TYPE);
+    if (metadataItem != null && !MapUtils.isEmpty(metadataItem.getProperties())) {
+      String featuredImageIdProp = metadataItem.getProperties().get(FEATURED_IMAGE_ID);
+      long noteFeaturedImageId = featuredImageIdProp != null
+          && !featuredImageIdProp.equals("null") ? Long.parseLong(featuredImageIdProp) : 0L;
+      FileItem fileItem = fileService.getFile(noteFeaturedImageId);
+      if (fileItem != null && fileItem.getFileInfo() != null) {
+        FileInfo fileInfo = fileItem.getFileInfo();
+        if (thumbnailSize != null) {
+          int[] dimension = org.exoplatform.social.common.Utils.parseDimension(thumbnailSize);
+          fileItem = imageThumbnailService.getOrCreateThumbnail(fileItem, dimension[0], dimension[1]);
+        }
+        return new NoteFeaturedImage(fileInfo.getId(),
+                                     fileInfo.getName(),
+                                     fileInfo.getMimetype(),
+                                     fileInfo.getSize(),
+                                     fileInfo.getUpdatedDate().getTime(),
+                                     fileItem.getAsStream());
+      }
+    }
+    return null;
+  }
+
+  private NoteMetadataObject buildNoteMetadataObject(Page note, String lang, String objectType) {
+    Space space = spaceService.getSpaceByGroupId(note.getWikiOwner());
+    long spaceId = space != null ? Long.parseLong(space.getId()) : 0L;
+    String noteId = String.valueOf(note.getId());
+    noteId = lang != null ? noteId + "-" + lang : noteId;
+    return new NoteMetadataObject(objectType, noteId, note.getParentPageId(), spaceId);
+  }
+
+  private MetadataItem getNoteMetadataItem(Page note, String lang, String objectType) {
+    NoteMetadataObject noteMetadataObject = buildNoteMetadataObject(note, lang, objectType);
+    return metadataService.getMetadataItemsByMetadataAndObject(NOTES_METADATA_KEY, noteMetadataObject)
+                          .stream()
+                          .findFirst()
+                          .orElse(null);
+  }
+
+  private void copyNotePageProperties(Page oldNote,
+                                      Page note,
+                                      String oldLang,
+                                      String lang,
+                                      String oldObjectType,
+                                      String newObjectType,
+                                      String username) {
+    if (note == null || oldNote == null) {
+      return;
+    }
+      if (username != null) {
+      org.exoplatform.social.core.identity.model.Identity identity =
+                                                                   identityManager.getOrCreateIdentity(OrganizationIdentityProvider.NAME,
+                                                                                                       username);
+      NoteMetadataObject newNoteMetadataObject = buildNoteMetadataObject(note, lang, newObjectType);
+      MetadataItem oldNoteMetadataItem = getNoteMetadataItem(oldNote, oldLang, oldObjectType);
+      MetadataItem newNoteMetadataItem = getNoteMetadataItem(note, lang, newObjectType);
+      if (oldNoteMetadataItem != null && oldNoteMetadataItem.getProperties() != null) {
+        if (newNoteMetadataItem != null) {
+          newNoteMetadataItem.setProperties(oldNoteMetadataItem.getProperties());
+          metadataService.updateMetadataItem(newNoteMetadataItem, Long.parseLong(identity.getId()), false);
+        } else {
+          try {
+            metadataService.createMetadataItem(newNoteMetadataObject,
+                                               NOTES_METADATA_KEY,
+                                               oldNoteMetadataItem.getProperties(),
+                                               Long.parseLong(identity.getId()),
+                                               false);
+          } catch (Exception e) {
+            log.error("Error while creating note metadata item", e);
+          }
+        }
+      }
+    }
+  }
+  
+  private boolean isOriginalFeaturedImage(Page draftPage, Page targetPage) {
+    if (draftPage == null || targetPage == null) {
+      return false;
+    }
+    if (draftPage.getProperties() == null || targetPage.getProperties() == null) {
+      return false;
+    }
+    NoteFeaturedImage draftFeaturedImage = draftPage.getProperties().getFeaturedImage();
+    NoteFeaturedImage targetFeaturedImage = targetPage.getProperties().getFeaturedImage();
+    return draftFeaturedImage != null && targetFeaturedImage != null
+        && targetFeaturedImage.getId().equals(draftFeaturedImage.getId());
+  }
+  
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public void removeNoteFeaturedImage(Long noteId,
+                                      Long featuredImageId,
+                                      String lang,
+                                      boolean isDraft,
+                                      Long userIdentityId) throws Exception {
+    boolean removeFeaturedImageFile = true;
+    Page note;
+    if (isDraft) {
+      DraftPage draftPage = getDraftNoteById(String.valueOf(noteId),
+                                             identityManager.getIdentity(String.valueOf(userIdentityId)).getRemoteId());
+      if (draftPage != null && draftPage.getTargetPageId() != null
+          && isOriginalFeaturedImage(draftPage, getNoteByIdAndLang(Long.valueOf(draftPage.getTargetPageId()), lang))) {
+        removeFeaturedImageFile = false;
+      }
+      note = draftPage;
+    } else {
+      note = getNoteByIdAndLang(noteId, lang);
+    }
+    if (note == null) {
+      throw new ObjectNotFoundException("note not found");
+    }
+    if (removeFeaturedImageFile && featuredImageId != null && featuredImageId > 0) {
+      fileService.deleteFile(featuredImageId);
+    }
+    MetadataItem metadataItem = getNoteMetadataItem(note,
+                                                    lang,
+                                                    isDraft ? NOTE_METADATA_DRAFT_PAGE_OBJECT_TYPE
+                                                            : NOTE_METADATA_PAGE_OBJECT_TYPE);
+    if (metadataItem != null && metadataItem.getProperties() != null) {
+      Map<String, String> properties = metadataItem.getProperties();
+      properties.remove(FEATURED_IMAGE_ID);
+      properties.remove(FEATURED_IMAGE_UPDATED_DATE);
+      properties.remove(FEATURED_IMAGE_ALT_TEXT);
+      metadataItem.setProperties(properties);
+      metadataService.updateMetadataItem(metadataItem, userIdentityId, false);
+    }
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public NotePageProperties saveNoteMetadata(NotePageProperties notePageProperties, String lang, Long userIdentityId) throws Exception {
+    if (notePageProperties == null) {
+      return null;
+    }
+    Page note;
+    Long featuredImageId = null;
+    NoteFeaturedImage featuredImage = notePageProperties.getFeaturedImage();
+    if (notePageProperties.isDraft()) {
+      note = getDraftNoteById(String.valueOf(notePageProperties.getNoteId()),
+                              identityManager.getIdentity(String.valueOf(userIdentityId)).getRemoteId());
+    } else {
+      note = getNoteByIdAndLang(notePageProperties.getNoteId(), lang);
+    }
+    if (note == null) {
+      throw new ObjectNotFoundException("note not found");
+    }
+
+    if (featuredImage != null && featuredImage.isToDelete()) {
+      removeNoteFeaturedImage(Long.valueOf(note.getId()),
+                              featuredImage.getId(),
+                              lang,
+                              notePageProperties.isDraft(),
+                              userIdentityId);
+    } else {
+      featuredImageId = saveNoteFeaturedImage(note, featuredImage);
+    }
+    NoteMetadataObject noteMetadataObject =
+                                          buildNoteMetadataObject(note,
+                                                                  lang,
+                                                                  notePageProperties.isDraft() ? NOTE_METADATA_DRAFT_PAGE_OBJECT_TYPE
+                                                                                               : NOTE_METADATA_PAGE_OBJECT_TYPE);
+    MetadataItem metadataItem = getNoteMetadataItem(note,
+                                                    lang,
+                                                    notePageProperties.isDraft() ? NOTE_METADATA_DRAFT_PAGE_OBJECT_TYPE
+                                                                                 : NOTE_METADATA_PAGE_OBJECT_TYPE);
+
+    Map<String, String> properties = new HashMap<>();
+    if (metadataItem != null && metadataItem.getProperties() != null) {
+      properties = metadataItem.getProperties();
+    }
+    properties.put(SUMMARY_PROP, notePageProperties.getSummary());
+    if (featuredImageId != null) {
+      properties.put(FEATURED_IMAGE_ID, String.valueOf(featuredImageId));
+      properties.put(FEATURED_IMAGE_UPDATED_DATE, String.valueOf(new Date().getTime()));
+      properties.put(FEATURED_IMAGE_ALT_TEXT, notePageProperties.getFeaturedImage().getAltText());
+    }
+    if (metadataItem == null) {
+      metadataService.createMetadataItem(noteMetadataObject, NOTES_METADATA_KEY, properties, userIdentityId, false);
+    } else {
+      metadataItem.setProperties(properties);
+      metadataService.updateMetadataItem(metadataItem, userIdentityId, false);
+    }
+    if (featuredImage != null) {
+      featuredImage.setId(featuredImageId);
+      featuredImage.setLastUpdated(Long.valueOf(properties.getOrDefault(FEATURED_IMAGE_UPDATED_DATE, "0")));
+      featuredImage.setUploadId(null);
+      notePageProperties.setFeaturedImage(featuredImage);
+    }
+    return notePageProperties;
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public PageVersion getPageVersionById(Long versionId) {
+    if (versionId == null) {
+      throw new IllegalArgumentException("version id is mandatory");
+    }
+    return dataStorage.getPageVersionById(versionId);
   }
 }

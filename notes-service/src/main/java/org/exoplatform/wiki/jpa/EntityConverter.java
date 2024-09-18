@@ -19,6 +19,11 @@
 
 package org.exoplatform.wiki.jpa;
 
+import io.meeds.notes.model.NoteFeaturedImage;
+import io.meeds.notes.model.NoteMetadataObject;
+import io.meeds.notes.model.NotePageProperties;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.exoplatform.commons.file.model.FileInfo;
@@ -30,12 +35,18 @@ import org.exoplatform.services.log.Log;
 import org.exoplatform.social.core.identity.model.Identity;
 import org.exoplatform.social.core.identity.provider.OrganizationIdentityProvider;
 import org.exoplatform.social.core.manager.IdentityManager;
+import org.exoplatform.social.core.space.model.Space;
+import org.exoplatform.social.core.space.spi.SpaceService;
+import org.exoplatform.social.metadata.MetadataService;
+import org.exoplatform.social.metadata.model.MetadataKey;
+import org.exoplatform.social.metadata.model.MetadataType;
 import org.exoplatform.wiki.WikiException;
 import org.exoplatform.wiki.jpa.dao.PageDAO;
 import org.exoplatform.wiki.jpa.dao.WikiDAO;
 import org.exoplatform.wiki.jpa.entity.*;
 import org.exoplatform.wiki.model.*;
 import org.exoplatform.wiki.service.IDType;
+import org.exoplatform.wiki.service.impl.NoteServiceImpl;
 import org.exoplatform.wiki.utils.Utils;
 
 import java.io.ByteArrayInputStream;
@@ -46,7 +57,17 @@ import java.util.*;
  */
 public class EntityConverter {
 
-  private static final Log LOG                            = ExoLogger.getLogger(EntityConverter.class);
+  private static final Log       LOG = ExoLogger.getLogger(EntityConverter.class);
+
+  private static SpaceService    spaceService;
+
+  private static MetadataService metadataService;
+
+  public static final MetadataType NOTES_METADATA_TYPE = new MetadataType(1001, "notes");
+
+  public static final MetadataKey  NOTES_METADATA_KEY   = new MetadataKey(NOTES_METADATA_TYPE.getName(),
+                                                                         Utils.NOTES_METADATA_OBJECT_TYPE,
+                                                                         0);
 
   public static Wiki convertWikiEntityToWiki(WikiEntity wikiEntity) {
     Wiki wiki = null;
@@ -122,10 +143,64 @@ public class EntityConverter {
       page.setActivityId(pageEntity.getActivityId());
       page.setDeleted(pageEntity.isDeleted());
       page.setUrl(Utils.getPageUrl(page));
+      buildNotePageMetadata(page, page.isDraftPage());
     }
     return page;
   }
 
+  public static void buildNotePageMetadata(Page note, boolean isDraft) {
+    if (note == null) {
+      return;
+    }
+    Space space = getSpaceService().getSpaceByGroupId(note.getWikiOwner());
+    if (space != null) {
+      String noteId = note.getId();
+      if (note.getLang() != null) {
+        noteId = noteId + "-" + note.getLang();
+      }
+      NoteMetadataObject noteMetadataObject = new NoteMetadataObject(isDraft ? "noteDraftPage" : "notePage",
+                                                                     noteId,
+                                                                     note.getParentPageId(),
+                                                                     Long.parseLong(space.getId()));
+      getMetadataService().getMetadataItemsByMetadataAndObject(NOTES_METADATA_KEY, noteMetadataObject)
+                          .stream()
+                          .findFirst()
+                          .ifPresent(metadataItem -> {
+                            if (!MapUtils.isEmpty(metadataItem.getProperties())) {
+                              buildPageProperties(metadataItem.getProperties(), note);
+                            }
+                          });
+
+    }
+  }
+  
+  private static void buildPageProperties(Map<String, String> properties, Page note) {
+    NotePageProperties notePageProperties = new NotePageProperties();
+    NoteFeaturedImage noteFeaturedImage = new NoteFeaturedImage();
+    notePageProperties.setNoteId(Long.parseLong(note.getId()));
+    notePageProperties.setSummary(properties.get(NoteServiceImpl.SUMMARY_PROP));
+    noteFeaturedImage.setId(Long.valueOf(properties.getOrDefault(NoteServiceImpl.FEATURED_IMAGE_ID, "0")));
+    noteFeaturedImage.setLastUpdated(Long.valueOf(properties.getOrDefault(NoteServiceImpl.FEATURED_IMAGE_UPDATED_DATE, "0")));
+    noteFeaturedImage.setAltText(properties.get(NoteServiceImpl.FEATURED_IMAGE_ALT_TEXT));
+    notePageProperties.setDraft(note.isDraftPage());
+    notePageProperties.setFeaturedImage(noteFeaturedImage);
+    note.setProperties(notePageProperties);
+  }
+
+  private static SpaceService getSpaceService() {
+    if (spaceService == null) {
+      spaceService = CommonsUtils.getService(SpaceService.class);
+    }
+    return spaceService;
+  }
+
+  private static MetadataService getMetadataService() {
+    if (metadataService == null) {
+      metadataService = CommonsUtils.getService(MetadataService.class);
+    }
+    return metadataService;
+  }
+  
   public static List<PermissionEntry> convertPermissionEntitiesToPermissionEntries(List<PermissionEntity> permissionEntities,
                                                                                    List<PermissionType> filteredPermissionTypes) {
     List<PermissionEntry> permissionEntries = new ArrayList<>();
@@ -365,6 +440,13 @@ public class EntityConverter {
     return attachmentEntity;
   }
 
+  public static List<DraftPage> convertDraftPageEntitiesToDraftPages(List<DraftPageEntity> draftPageEntities) {
+    if (CollectionUtils.isEmpty(draftPageEntities)) {
+      return new ArrayList<>();
+    }
+    return draftPageEntities.stream().map(EntityConverter::convertDraftPageEntityToDraftPage).toList();
+  }
+  
   public static DraftPage convertDraftPageEntityToDraftPage(DraftPageEntity draftPageEntity) {
     DraftPage draftPage = null;
     if (draftPageEntity != null) {
@@ -406,6 +488,7 @@ public class EntityConverter {
           draftPage.setWikiType(wiki.getType());
         }
       }
+      buildNotePageMetadata(draftPage, true);
     }
     return draftPage;
   }
@@ -435,6 +518,7 @@ public class EntityConverter {
         draftPageEntity.setParentPage(pageDAO.find(Long.valueOf(parentPageId)));
       }
       draftPageEntity.setTargetRevision(draftPage.getTargetPageRevision());
+      buildNotePageMetadata(draftPage, true);
     }
     return draftPageEntity;
   }
@@ -454,6 +538,8 @@ public class EntityConverter {
       pageVersion.setOwner(pageVersionEntity.getAuthor());
       pageVersion.setParent(convertPageEntityToPage(pageVersionEntity.getPage()));
       pageVersion.setLang(pageVersionEntity.getLang());
+      pageVersion.setWikiOwner(pageVersionEntity.getPage().getWiki().getOwner());
+      buildNotePageMetadata(pageVersion, pageVersion.isDraftPage());
     }
     return pageVersion;
   }
