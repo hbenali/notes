@@ -760,8 +760,8 @@ public class NotesRestService implements ResourceContainer {
           }
           note_ = noteService.updateNote(note_, PageUpdateType.EDIT_PAGE_CONTENT_AND_TITLE, identity);
         } else {
-          note_.setLang(note.getLang());
           note_ = noteService.updateNote(note_, PageUpdateType.EDIT_PAGE_CONTENT_AND_TITLE, identity);
+          note_.setLang(note.getLang());
           note_.setTitle(note.getTitle());
           note_.setContent(note.getContent());
           note_.setProperties(notePageProperties);
@@ -782,8 +782,8 @@ public class NotesRestService implements ResourceContainer {
           note_.setProperties(notePageProperties);
           note_ = noteService.updateNote(note_, PageUpdateType.EDIT_PAGE_TITLE, identity);
         } else {
-          note_.setLang(note.getLang());
           note_ = noteService.updateNote(note_, PageUpdateType.EDIT_PAGE_TITLE, identity);
+          note_.setLang(note.getLang());
           note_.setTitle(note.getTitle());
           note_.setProperties(notePageProperties);
         }
@@ -798,8 +798,8 @@ public class NotesRestService implements ResourceContainer {
           note_.setProperties(notePageProperties);
           note_ = noteService.updateNote(note_, PageUpdateType.EDIT_PAGE_CONTENT, identity);
         } else {
-          note_.setLang(note.getLang());
           note_ = noteService.updateNote(note_, PageUpdateType.EDIT_PAGE_CONTENT, identity);
+          note_.setLang(note.getLang());
           note_.setContent(note.getContent());
           note_.setProperties(notePageProperties);
         }
@@ -814,8 +814,8 @@ public class NotesRestService implements ResourceContainer {
           note_.setProperties(notePageProperties);
           note_ = noteService.updateNote(note_, PageUpdateType.EDIT_PAGE_PROPERTIES, identity);
         } else {
-          note_.setLang(note.getLang());
           note_ = noteService.updateNote(note_, PageUpdateType.EDIT_PAGE_PROPERTIES, identity);
+          note_.setLang(note.getLang());
           note_.setProperties(notePageProperties);
         }
         noteService.createVersionOfNote(note_, identity.getUserId());
