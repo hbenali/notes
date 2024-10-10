@@ -270,6 +270,15 @@ import lombok.SneakyThrows;
         createdPage.setCanImport(canImportNotes(note.getAuthor(), space, note));
         createdPage.setCanView(canViewNotes(note.getAuthor(), space, note));
       }
+      dataStorage.addPageVersion(createdPage, userIdentity.getUserId());
+      PageVersion pageVersion = dataStorage.getPublishedVersionByPageIdAndLang(Long.valueOf(createdPage.getId()), createdPage.getLang());
+      createdPage.setLatestVersionId(pageVersion != null ? pageVersion.getId() : null);
+      if (pageVersion != null && draftPageId != null) {
+        Map<String, String> eventData = new HashMap<>();
+        eventData.put("draftPageId", draftPageId);
+        eventData.put("pageVersionId", pageVersion.getId());
+        Utils.broadcast(listenerService, "note.page.version.created", this, eventData);
+      }
       return createdPage;
     } else {
       throw new EntityNotFoundException("Parent note not found");
@@ -1002,6 +1011,8 @@ import lombok.SneakyThrows;
     PageVersion pageVersion = dataStorage.addPageVersion(note, userName);
     pageVersion.setAttachmentObjectType(note.getAttachmentObjectType());
     updateVersionContentImages(pageVersion);
+    String pageVersionId = pageVersion.getId();
+    note.setLatestVersionId(pageVersionId);
     if (note.getLang() != null) {
       try {
         NotePageProperties properties = note.getProperties();
@@ -1023,8 +1034,14 @@ import lombok.SneakyThrows;
                              null,
                              NOTE_METADATA_PAGE_OBJECT_TYPE,
                              NOTE_METADATA_VERSION_PAGE_OBJECT_TYPE,
-                             userName
-      );
+                             userName);
+    }
+    DraftPage draftPage = dataStorage.getLatestDraftPageByTargetPageAndLang(Long.valueOf(note.getId()), note.getLang());
+    if (draftPage != null) {
+      Map<String, String> eventData = new HashMap<>();
+      eventData.put("draftPageId", draftPage.getId());
+      eventData.put("pageVersionId", pageVersionId);
+      Utils.broadcast(listenerService, "note.page.version.created", this, eventData);
     }
   }
 
@@ -1209,6 +1226,14 @@ import lombok.SneakyThrows;
     newDraftPage.setProperties(properties);
     newDraftPage.setAttachmentObjectType(draftPage.getAttachmentObjectType());
     newDraftPage = processImagesOnDraftCreation(newDraftPage, Long.parseLong(userIdentity.getId()));
+    //
+    PageVersion pageVersion = getPublishedVersionByPageIdAndLang(Long.valueOf(newDraftPage.getTargetPageId()), newDraftPage.getLang());
+    if (pageVersion != null) {
+      Map<String, String> eventData = new HashMap<>();
+      eventData.put("pageVersionId", pageVersion.getId());
+      eventData.put("draftForExistingPageId", newDraftPage.getId());
+      Utils.broadcast(listenerService, "note.draft.for.exist.page.created", this, eventData);
+    }
     return newDraftPage;
   }
 
@@ -1404,6 +1429,7 @@ import lombok.SneakyThrows;
       page.setContent(publishedVersion.getContent());
       page.setLang(publishedVersion.getLang());
       page.setProperties(publishedVersion.getProperties());
+      page.setLatestVersionId(publishedVersion.getId());
       if (lang != null) {
         page.setMetadatas(retrieveMetadataItems(pageId + "-" + lang, userIdentity.getUserId()));
       }
@@ -1420,8 +1446,7 @@ import lombok.SneakyThrows;
       page.setTitle(publishedVersion.getTitle());
       page.setContent(publishedVersion.getContent());
       page.setLang(publishedVersion.getLang());
-      page.setProperties(publishedVersion.getProperties());
-    }
+      page.setProperties(publishedVersion.getProperties());}
     return page;
   }
 

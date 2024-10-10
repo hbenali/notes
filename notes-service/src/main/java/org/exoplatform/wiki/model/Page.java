@@ -94,6 +94,8 @@ public class Page {
 
   private boolean                         hasChild;
 
+  private String                         latestVersionId;
+
   private boolean                         isDeleted;
 
   private Page                            parent;
