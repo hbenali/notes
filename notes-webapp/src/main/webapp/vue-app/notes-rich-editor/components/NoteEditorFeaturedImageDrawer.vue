@@ -26,6 +26,7 @@
     :src="featuredImageLink"
     :max-file-size="maxFileSize"
     :crop-options="cropOptions"
+    use-format
     alt
     @input="uploadId = $event"
     @data="imageData = $event"
@@ -38,7 +39,6 @@ export default {
     return {
       uploadId: null,
       maxFileSize: 20971520,
-      format: 'landscape',
       imageData: null,
       featuredImageAltText: null,
       hasFeaturedImageValue: false,
