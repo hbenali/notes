@@ -36,6 +36,7 @@ CKEDITOR.editorConfig = function (config) {
   if (webPageNote) {
     blocksToolbarGroup.splice(blocksToolbarGroup.indexOf('tagSuggester'), 1);
     blocksToolbarGroup.splice(blocksToolbarGroup.indexOf('InsertOptions'), 1);
+    blocksToolbarGroup.splice(blocksToolbarGroup.indexOf('attachFile'), 1);
   }
   const toolbar = [
     {name: 'accessibility', items: ['A11ychecker']},
@@ -70,7 +71,7 @@ CKEDITOR.editorConfig = function (config) {
     },
     {
       name: 'blocks',
-      items: ['Blockquote', 'attachFile']
+      items: ['Blockquote']
     },
   ];
   if (!webPageNote) {
