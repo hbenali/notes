@@ -1434,6 +1434,11 @@ import lombok.SneakyThrows;
         page.setMetadatas(retrieveMetadataItems(pageId + "-" + lang, userIdentity.getUserId()));
       }
     }
+    if (publishedVersion == null && lang != null) {
+      //no version with lang, set the latest version without lang id
+      publishedVersion = dataStorage.getPublishedVersionByPageIdAndLang(pageId, null);
+      page.setLatestVersionId(publishedVersion == null ? null : publishedVersion.getId());
+    }
     return page;
   }
 

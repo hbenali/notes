@@ -299,7 +299,7 @@ export default {
     document.addEventListener('note-custom-plugins', this.openCustomPluginsDrawer);
     document.addEventListener('notes-editor-upload-progress', () => this.contentImageUploadProgress = true);
     document.addEventListener('notes-editor-upload-done', () => this.contentImageUploadProgress = false);
-    document.addEventListener('notes-editor-extensions-updated', this.refreshEditorExtensions);
+    document.addEventListener('notes-extensions-updated', this.refreshEditorExtensions);
   },
   methods: {
     metadataUpdated(properties) {
