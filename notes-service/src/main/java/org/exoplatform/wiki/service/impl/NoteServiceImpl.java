@@ -156,6 +156,8 @@ import lombok.SneakyThrows;
 
   public static final String                              HIDE_AUTHOR_PROP                       = "hideAuthor";
 
+  public static final String                              HIDE_REACTION_PROP                     = "hideReaction";
+
   public static final String                              FEATURED_IMAGE_ID                      = "featuredImageId";
 
   public static final String                              FEATURED_IMAGE_UPDATED_DATE            = "featuredImageUpdatedDate";
@@ -1747,6 +1749,7 @@ import lombok.SneakyThrows;
     }
     properties.put(SUMMARY_PROP, notePageProperties.getSummary());
     properties.put(HIDE_AUTHOR_PROP, String.valueOf(notePageProperties.isHideAuthor()));
+    properties.put(HIDE_REACTION_PROP, String.valueOf(notePageProperties.isHideReaction()));
     if (featuredImageId != null) {
       properties.put(FEATURED_IMAGE_ID, String.valueOf(featuredImageId));
       properties.put(FEATURED_IMAGE_UPDATED_DATE, String.valueOf(new Date().getTime()));
