@@ -164,6 +164,8 @@ import lombok.SneakyThrows;
 
   public static final String                              FEATURED_IMAGE_ALT_TEXT                = "featuredImageAltText";
 
+  public static final String                              NOTE_DELETED                           = "note.deleted";
+
   private final WikiService                               wikiService;
 
   private final DataStorage                               dataStorage;
@@ -408,7 +410,6 @@ import lombok.SneakyThrows;
 
     try {
       dataStorage.deletePage(noteType, noteOwner, noteName);
-
     } catch (WikiException e) {
       log.error("Can't delete note '" + noteName + "' ", e);
       return false;
@@ -458,7 +459,7 @@ import lombok.SneakyThrows;
 
       deleteNote(noteType, noteOwner, noteName);
       postDeletePage(noteType, noteOwner, noteName, note);
-
+      Utils.broadcast(listenerService, NOTE_DELETED, userIdentity, note);
       // Post delete activity for all children pages
       for (Page childNote : allChrildrenPages) {
         postDeletePage(childNote.getWikiType(), childNote.getWikiOwner(), childNote.getName(), childNote);
