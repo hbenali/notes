@@ -250,7 +250,7 @@ import lombok.SneakyThrows;
       note.setContent(note.getContent());
       Page createdPage = createNote(noteBook, parentPage, note);
       NotePageProperties properties = note.getProperties();
-      String draftPageId = String.valueOf(properties != null && properties.isDraft() ? properties.getNoteId() : null);
+      String draftPageId = properties != null && properties.isDraft() ? String.valueOf(properties.getNoteId()) : null;
       try {
         if (properties != null) {
           properties.setNoteId(Long.parseLong(createdPage.getId()));
