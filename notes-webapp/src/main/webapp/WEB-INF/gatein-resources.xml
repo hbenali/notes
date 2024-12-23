@@ -50,6 +50,15 @@
         <path>/javascript/notes.bundle.js</path>
       </script>
       <depends>
+        <module>NotesPublication</module>
+      </depends>
+      <depends>
+        <module>NotesTreeview</module>
+      </depends>
+      <depends>
+        <module>imageCropper</module>
+      </depends>
+      <depends>
         <module>html2canvas</module>
       </depends>
       <depends>
@@ -87,6 +96,12 @@
       <path>/javascript/notesRichEditor.bundle.js</path>
     </script>
     <depends>
+      <module>NotesPublication</module>
+    </depends>
+    <depends>
+      <module>NotesTreeview</module>
+    </depends>
+    <depends>
       <module>commonVueComponents</module>
     </depends>
     <depends>
@@ -114,6 +129,55 @@
     </depends>
   </module>
 
+  <module>
+    <name>NotesPublication</name>
+    <load-group>NotesGRP</load-group>
+    <script>
+      <path>/javascript/notesPublication.bundle.js</path>
+    </script>
+    <depends>
+      <module>commonVueComponents</module>
+    </depends>
+    <depends>
+      <module>extensionRegistry</module>
+    </depends>
+    <depends>
+      <module>vue</module>
+    </depends>
+    <depends>
+      <module>vuetify</module>
+    </depends>
+    <depends>
+      <module>eXoVueI18n</module>
+    </depends>
+    <depends>
+      <module>imageCropper</module>
+    </depends>
+  </module>
+
+  <module>
+    <name>NotesTreeview</name>
+    <load-group>NotesGRP</load-group>
+    <script>
+      <path>/javascript/notesTreeview.bundle.js</path>
+    </script>
+    <depends>
+      <module>commonVueComponents</module>
+    </depends>
+    <depends>
+      <module>extensionRegistry</module>
+    </depends>
+    <depends>
+      <module>vue</module>
+    </depends>
+    <depends>
+      <module>vuetify</module>
+    </depends>
+    <depends>
+      <module>eXoVueI18n</module>
+    </depends>
+  </module>
+  
   <portlet>
     <name>NotesEditor</name>
     <module>

@@ -36,19 +36,20 @@ import java.util.HashMap;
 import java.util.List;
 
 import org.apache.commons.io.FileUtils;
-
-import org.exoplatform.commons.ObjectAlreadyExistsException;
 import org.exoplatform.commons.file.services.FileService;
-import org.exoplatform.portal.config.model.PortalConfig;
-import org.exoplatform.services.security.Identity;
-import org.exoplatform.services.security.IdentityConstants;
-import org.exoplatform.services.security.IdentityRegistry;
-import org.exoplatform.services.security.MembershipEntry;
 import org.exoplatform.social.core.manager.IdentityManager;
 import org.exoplatform.social.core.space.model.Space;
 import org.exoplatform.social.core.space.spi.SpaceService;
 import org.exoplatform.upload.UploadResource;
 import org.exoplatform.upload.UploadService;
+
+import org.exoplatform.commons.ObjectAlreadyExistsException;
+import org.exoplatform.portal.config.model.PortalConfig;
+import org.exoplatform.services.security.Identity;
+import org.exoplatform.services.security.IdentityConstants;
+import org.exoplatform.services.security.IdentityRegistry;
+import org.exoplatform.services.security.MembershipEntry;
+
 import org.exoplatform.wiki.WikiException;
 import org.exoplatform.wiki.jpa.BaseTest;
 import org.exoplatform.wiki.jpa.JPADataStorage;
@@ -744,7 +745,14 @@ import org.exoplatform.wiki.service.plugin.WikiPageAttachmentPlugin;
   }
   
   private Page createTestNoteWithVersionLang(String name, String lang, Identity user) throws Exception {
-    Wiki portalWiki = getOrCreateWiki(wService, PortalConfig.PORTAL_TYPE, "testPortal");
+    identityManager.getOrCreateUserIdentity("root");
+    Space space = new Space();
+    space.setDisplayName("test");
+    space.setPrettyName("test");
+    space.setRegistration(Space.OPEN);
+    space.setVisibility(Space.PUBLIC);
+    space = spaceService.createSpace(space, "root");
+    Wiki portalWiki = getOrCreateWiki(wService, PortalConfig.PORTAL_TYPE, space.getGroupId());
     Page note = noteService.createNote(portalWiki, "Home", new Page(name, name), user);
     note.setLang(lang);
     note.setTitle("language title");
@@ -992,10 +1000,10 @@ import org.exoplatform.wiki.service.plugin.WikiPageAttachmentPlugin;
    }
 
    public void testGetDraftsOfWiki() throws Exception {
-     Identity user = new Identity("user");
+     Identity root = new Identity("root");
      Wiki portalWiki = getOrCreateWiki(wService, PortalConfig.PORTAL_TYPE, "testPortal");
-     Page note = noteService.createNote(portalWiki, "Home", new Page("testGetDraftsOfWiki", "testGetDraftsOfWiki"), user);
-     Page note2 = noteService.createNote(portalWiki, "Home", new Page("testGetDraftsOfWiki", "testGetDraftsOfWiki"), user);
+     Page note = noteService.createNote(portalWiki, "Home", new Page("testGetDraftsOfWiki", "testGetDraftsOfWiki"), root);
+     Page note2 = noteService.createNote(portalWiki, "Home", new Page("testGetDraftsOfWiki", "testGetDraftsOfWiki"), root);
      DraftPage draftPage = new DraftPage();
      draftPage.setTitle("test");
      draftPage.setContent("test");
@@ -1005,7 +1013,35 @@ import org.exoplatform.wiki.service.plugin.WikiPageAttachmentPlugin;
      draftPage.setParentPageId(note2.getId());
      noteService.createDraftForExistPage(draftPage, note, null, new Date().getTime(), "root");
      assertEquals(2, noteService.getDraftsOfWiki(portalWiki.getOwner(), portalWiki.getType(), portalWiki.getWikiHome().getName()).size());
+   }
 
+   public void testSaveHideAuthorAndHideReactionProperties() throws Exception {
+     Identity user = new Identity("user");
+     Page note = createTestNoteWithVersionLang("testMetadataHideAuthorAndHideReaction", null, user);
+
+     this.bindMockedUploadService();
+
+     NotePageProperties notePageProperties = createNotePageProperties(Long.parseLong(note.getId()), "alt text", "summary test");
+     notePageProperties.setHideAuthor(true);
+     notePageProperties.setHideReaction(true);
+     NotePageProperties properties = noteService.saveNoteMetadata(notePageProperties, null, 1L);
+     assertEquals("summary test", properties.getSummary());
+     assertTrue(properties.isHideAuthor());
+     assertTrue(properties.isHideReaction());
+
+     note.setLang("en");
+     note.setTitle("en title");
+     note.setContent("en content");
+     noteService.createVersionOfNote(note, user.getUserId());
+     notePageProperties = createNotePageProperties(Long.parseLong(note.getId()), "alt text en", "summary test en");
+     notePageProperties.setHideAuthor(false);
+     noteService.saveNoteMetadata(notePageProperties, "en", 1L);
+
+     // when fetch version language metadata properties we should return the original
+     // note properties values in case of shared original properties values
+     note = noteService.getNoteByIdAndLang(Long.valueOf(note.getId()), "en");
+     assertTrue(note.getProperties().isHideAuthor());
+     assertTrue(properties.isHideReaction());
    }
 
    public void testProcessingNoteContentImages() throws Exception {
@@ -1024,7 +1060,7 @@ import org.exoplatform.wiki.service.plugin.WikiPageAttachmentPlugin;
      Page note = new Page();
      note.setTitle(draftPage.getTitle());
      note.setContent(draftPage.getContent());
-     note.setProperties(new NotePageProperties(Long.parseLong(draftPage.getId()), null, null, true));
+     note.setProperties(new NotePageProperties(Long.parseLong(draftPage.getId()), null, null, false, false, true));
      Identity root = new Identity("root");
      Wiki portalWiki = getOrCreateWiki(wService, PortalConfig.PORTAL_TYPE, "classic");
      note = noteService.createNote(portalWiki, "Home",note ,root);

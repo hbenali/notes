@@ -37,5 +37,10 @@ public class NotePageProperties implements Serializable {
 
   private NoteFeaturedImage featuredImage;
 
+  private boolean           hideAuthor;
+
+  private boolean           hideReaction;
+
   private boolean           isDraft;
+
 }

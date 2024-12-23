@@ -30,7 +30,7 @@
       :selected-language="selectedLanguage"
       :translations="translations"
       :is-mobile="isMobile"
-      :post-key="postKey"
+      :post-key="postKey + enablePostKeys"
       :draft-saving-status="draftSavingStatus"
       :publish-button-text="publishButtonText"
       :lang-button-tooltip-text="langButtonTooltipText"
@@ -42,31 +42,41 @@
       @editor-closed="editorClosed"
       @post-note="postNote"
       @open-metadata-drawer="openMetadataDrawer" />
-    <form class="notes-content">
-      <div class="notes-content-form singlePageApplication my-5 mx-auto py-1 px-5">
-        <div
-          v-show="!webPageNote"
-          class="formInputGroup notesTitle white px-5">
-          <input
-            id="notesTitle"
-            :ref="editorTitleInputRef"
-            v-model="noteObject.title"
-            :placeholder="titlePlaceholder"
-            type="text"
-            :maxlength="noteTitleMaxLength + 1"
-            class="py-0 px-1 mt-5 mb-0">
-        </div>
-        <div class="formInputGroup white overflow-auto flex notes-content-wrapper">
-          <textarea
-            :id="editorBodyInputRef"
-            :ref="editorBodyInputRef"
-            :placeholder="bodyPlaceholder"
-            :name="editorBodyInputRef"
-            class="notesFormInput">
+    <div class="notes-editor-body-section">
+      <div class="notes-editor-body-section-content">
+        <form class="notes-content">
+          <div class="notes-content-form">
+            <div
+              v-show="!webPageNote"
+              class="formInputGroup title notesTitle white px-5 pt-5 ">
+              <input
+                id="notesTitle"
+                :ref="editorTitleInputRef"
+                v-model="noteObject.title"
+                :placeholder="titlePlaceholder"
+                type="text"
+                :maxlength="noteTitleMaxLength + 1"
+                class="title text-color ma-0 pa-0"
+                @input="waitUserTyping()">
+            </div>
+            <div class="formInputGroup white overflow-auto flex notes-content-wrapper px-5 pb-5">
+              <textarea
+                :id="editorBodyInputRef"
+                :ref="editorBodyInputRef"
+                :placeholder="bodyPlaceholder"
+                :name="editorBodyInputRef"
+                class="notesFormInput">
             </textarea>
-        </div>
+            </div>
+          </div>
+        </form>
       </div>
-    </form>
+    </div>
+    <extension-registry-components
+      v-if="editorExtensions.length > 0"
+      name="NotesRichEditor"
+      type="notes-editor-extensions"
+      :params="extensionParams" />
     <note-custom-plugins
       ref="noteCustomPlugins"
       :instance="editor" />
@@ -78,6 +88,17 @@
       ref="featuredImageDrawer"
       :note="noteObject"
       :has-featured-image="hasFeaturedImage" />
+    <note-publication-drawer
+      v-if="publicationParams"
+      ref="editorPublicationDrawer"
+      :has-featured-image="hasFeaturedImage"
+      :is-publishing="isPublishing"
+      :params="publicationParams"
+      :edit-mode="editMode"
+      @publish="postAndPublishNote"
+      @metadata-updated="metadataUpdated"
+      @closed="publicationDrawerClosed" />
+    <note-publication-target-drawer />
   </div>
 </template>
 
@@ -90,7 +111,10 @@ export default {
       initialized: false,
       instanceReady: false,
       noteTitleMaxLength: 500,
-      updatingProperties: null,
+      typingTimer: null,
+      isUserTyping: false,
+      editorExtensions: [],
+      updatingProperties: false,
       enablePostKeys: 0,
       isPublishing: false,
       contentImageUploadProgress: false
@@ -192,14 +216,15 @@ export default {
     imagesDownloadFolder: {
       type: String,
       default: 'DRIVE_ROOT_NODE/notes/images'
+    },
+    publicationParams: {
+      type: Object,
+      default: null
     }
   },
   watch: {
     'noteObject.title': function(newVal, oldVal) {
-      if (newVal.length > this.noteTitleMaxLength) {
-        this.displayNoteTitleMaxLengthCheckAlert();
-        this.noteObject.title = oldVal;
-      }
+      this.displayNoteTitleMaxLengthCheckAlert(newVal, oldVal);
       this.updateData();
     },
     'noteObject.content': function () {
@@ -222,22 +247,48 @@ export default {
     instanceReady() {
       if (this.instanceReady) {
         this.$emit('editor-ready', this.editor);
+        this.bindNavigationRemoveListener();
       }
     }
   },
   computed: {
+    newEmptyTranslation() {
+      return !!this.note?.lang && !this.note?.title?.length && !this.note?.content?.length;
+    },
+    entityId() {
+      return this.newEmptyTranslation ? null : this.note?.draftPage ? this.note?.id : this.note?.latestVersionId;
+    },
+    extensionParams() {
+      return {
+        spaceId: this.getURLQueryParam('spaceId'),
+        entityId: this.entityId,
+        entityType: this.note.draftPage && 'WIKI_DRAFT_PAGES' || 'WIKI_PAGE_VERSIONS',
+        lang: this.note.lang,
+        isEmptyNoteTranslation: this.newEmptyTranslation
+      };
+    },
     hasFeaturedImage() {
       return !!this.noteObject?.properties?.featuredImage?.id;
     },
     saveNoteButtonDisabled() {
-      return this.updatingProperties || this.saveButtonDisabled;
+      return this.updatingProperties || this.saveButtonDisabled || this.isUserTyping;
     },
     isContentImagesUploadProgress() {
       return this.contentImageUploadProgress;
+    },
+    newPageDraft() {
+      return !this.noteObject?.id || (this.noteObject?.draftPage && !this.noteObject?.targetPageId);
+    },
+    editMode() {
+      return this.noteObject?.id && !this.newPageDraft;
+    },
+    isTranslation() {
+      return !!this.noteObject?.lang;
     }
   },
   created() {
     this.cloneNoteObject();
+    this.refreshEditorExtensions();
     this.$root.$on('include-page', this.includePage);
     this.$root.$on('update-note-title', this.updateTranslatedNoteTitle);
     this.$root.$on('update-note-content', this.updateTranslatedNoteContent);
@@ -245,12 +296,9 @@ export default {
     this.$root.$on('close-featured-image-byOverlay', this.closeFeaturedImageDrawerByOverlay);
 
     document.addEventListener('note-custom-plugins', this.openCustomPluginsDrawer);
-    document.addEventListener('notes-editor-upload-progress', () => {
-      this.contentImageUploadProgress = true ;
-    });
-    document.addEventListener('notes-editor-upload-done', () => {
-      this.contentImageUploadProgress = false;
-    });
+    document.addEventListener('notes-editor-upload-progress', () => this.contentImageUploadProgress = true);
+    document.addEventListener('notes-editor-upload-done', () => this.contentImageUploadProgress = false);
+    document.addEventListener('notes-extensions-updated', this.refreshEditorExtensions);
   },
   methods: {
     metadataUpdated(properties) {
@@ -261,8 +309,11 @@ export default {
         this.autoSave();
         this.waitForNoteMetadataUpdate();
       } else {
-        this.updatingProperties = null;
+        this.updatingProperties = false;
       }
+    },
+    refreshEditorExtensions() {
+      this.editorExtensions = extensionRegistry.loadComponents('NotesRichEditor') || [];
     },
     editorClosed(){
       this.$emit('editor-closed');
@@ -347,8 +398,19 @@ export default {
         }, 200);
       }
     },
-    postNote(toPublish) {
-      this.$emit('post-note', toPublish);
+    postNote() {
+      if (this.publicationParams && !this.isTranslation && !this.editMode) {
+        this.openPublicationDrawer(this.noteObject);
+        return;
+      }
+      this.postAndPublishNote();
+    },
+    postAndPublishNote(publicationSettings, note) {
+      if (this.publicationParams) {
+        this.noteObject = note;
+        this.updateData();
+      }
+      this.$emit('post-note', publicationSettings);
     },
     resetEditorData() {
       this.noteObject.title = null;
@@ -419,20 +481,9 @@ export default {
 
             const treeviewParentWrapper =  self.editor.window.$.document.getElementById('note-children-container');
             if ( treeviewParentWrapper ) {
-              treeviewParentWrapper.contentEditable='false';
+              treeviewParentWrapper.contentEditable = 'false';
             }
 
-            const removeTreeviewBtn =  evt.editor.document.getById( 'remove-treeview' );
-            if ( removeTreeviewBtn ) {
-              evt.editor.editable().attachListener( removeTreeviewBtn, 'click', function() {
-                const treeviewParentWrapper = evt.editor.document.getById( 'note-children-container' );
-                if ( treeviewParentWrapper) {
-                  treeviewParentWrapper.remove();
-                  self.noteObject.content = evt.editor.getData();
-                }
-                self.setFocus();
-              });
-            }
             window.setTimeout(() => self.setFocus(), 50);
             self.$root.$applicationLoaded();
             self.instanceReady = true;
@@ -444,6 +495,7 @@ export default {
               self.initialized = true;
               return;
             }
+            self.waitUserTyping(self);
             self.noteObject.content = evt.editor.getData();
             self.autoSave();
             const removeTreeviewBtn =  evt.editor.document.getById( 'remove-treeview' );
@@ -507,9 +559,16 @@ export default {
         return;
       }
       this.$refs.editorMetadataDrawer.close();
+      this.$refs.editorPublicationDrawer.close();
     },
     isImageDrawerClosed() {
       return this.$refs.featuredImageDrawer.isClosed();
+    },
+    openPublicationDrawer() {
+      this.$refs.editorPublicationDrawer.open(this.noteObject);
+    },
+    publicationDrawerClosed() {
+      this.enablePostKeys ++;
     },
     openMetadataDrawer() {
       this.$refs.editorMetadataDrawer.open(this.noteObject);
@@ -520,17 +579,50 @@ export default {
         alertMessage: detail?.message,
       }}));
     },
-    displayNoteTitleMaxLengthCheckAlert(){
-      const messageObject = {
-        type: 'warning',
-        message: this.$t('notes.title.max.length.warning.message', {0: this.noteTitleMaxLength})
-      };
-      this.displayAlert(messageObject);
+    displayNoteTitleMaxLengthCheckAlert(newTitle, oldTitle) {
+      if (newTitle?.length > this.noteTitleMaxLength) {
+        this.noteObject.title = oldTitle;
+        this.displayAlert({
+          type: 'warning',
+          message: this.$t('notes.title.max.length.warning.message', {0: this.noteTitleMaxLength})
+        });
+      }
     },
     waitForNoteMetadataUpdate() {
       setTimeout(() => {
-        this.updatingProperties = null;
+        this.updatingProperties = false;
       }, 1000);
+    },
+    setPublishing(publishing) {
+      this.isPublishing = publishing;
+    },
+    getURLQueryParam(paramName) {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.has(paramName)) {
+        return urlParams.get(paramName);
+      }
+    },
+    waitUserTyping(component) {
+      component ??= this;
+      clearTimeout(component.typingTimer);
+      component.isUserTyping = true;
+      component.typingTimer = setTimeout(function () {
+        component.isUserTyping = false;
+      }, 1000);
+    },
+    bindNavigationRemoveListener() {
+      const removeTreeviewBtn = this.editor.document.getById('remove-treeview');
+      if (removeTreeviewBtn) {
+        const self = this;
+        this.editor.editable().attachListener(removeTreeviewBtn, 'click', function () {
+          const treeviewParentWrapper = self.editor.document.getById('note-children-container');
+          if (treeviewParentWrapper) {
+            treeviewParentWrapper.remove();
+            self.noteObject.content = self.editor.getData();
+          }
+          self.setFocus();
+        });
+      }
     }
   }
 };

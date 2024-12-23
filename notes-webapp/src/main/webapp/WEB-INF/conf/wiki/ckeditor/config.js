@@ -30,11 +30,13 @@ CKEDITOR.editorConfig = function (config) {
     'Table',
     'EmbedSemantic',
     'CodeSnippet',
+    'attachFile',
     'InsertOptions'
   ];
   if (webPageNote) {
     blocksToolbarGroup.splice(blocksToolbarGroup.indexOf('tagSuggester'), 1);
     blocksToolbarGroup.splice(blocksToolbarGroup.indexOf('InsertOptions'), 1);
+    blocksToolbarGroup.splice(blocksToolbarGroup.indexOf('attachFile'), 1);
   }
   const toolbar = [
     {name: 'accessibility', items: ['A11ychecker']},
@@ -80,7 +82,7 @@ CKEDITOR.editorConfig = function (config) {
 
   require(['SHARED/extensionRegistry'], function(extensionRegistry) {
     const notesEditorExtensions = extensionRegistry.loadExtensions('NotesEditor', 'ckeditor-extensions');
-    if (notesEditorExtensions?.length && this.useExtraPlugins) {
+    if (notesEditorExtensions?.length) {
       notesEditorExtensions.forEach(notesEditorExtension => {
         if (notesEditorExtension.extraPlugin) {
           extraPlugins = `${extraPlugins},${notesEditorExtension.extraPlugin}`;
@@ -89,7 +91,7 @@ CKEDITOR.editorConfig = function (config) {
           removePlugins = `${extraPlugins},${notesEditorExtension.removePlugin}`;
         }
         if (notesEditorExtension.extraToolbarItem) {
-          toolbar[0].push(notesEditorExtension.extraToolbarItem);
+          toolbar[toolbar.length - 1].items.push(notesEditorExtension.extraToolbarItem);
         }
       });
     }

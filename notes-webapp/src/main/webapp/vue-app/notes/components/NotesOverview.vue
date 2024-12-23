@@ -97,9 +97,10 @@
                   </v-tooltip>
                 </div>
                 <note-favorite-action
-                  class="ms-2"
+                  :icon-size="20"
                   :note="note"
-                  :activity-id="note.activityId" />
+                  :activity-id="note.activityId" 
+                  class="ms-2" />
                 <div
                   class="d-inline-flex ms-2">
                   <v-tooltip bottom>
@@ -133,16 +134,26 @@
             width="100%"
             max-height="400" />
           <div class="notes-title">
-            <span
-              ref="noteTitle"
-              class="title text-color">
-              {{ noteTitle }}
-            </span>
-            <notes-translation-menu
-              :note="note"
-              :translations="translations"
-              :selected-translation="selectedTranslation"
-              @change-translation="changeTranslation" />
+            <p ref="noteTitle" class="title text-color text-break">
+              <span>
+                {{ noteTitle }}
+              </span>
+              <span>
+                <notes-translation-menu
+                  note="note"
+                  :translations="translations"
+                  :selected-translation="selectedTranslation"
+                  @change-translation="changeTranslation" />
+              </span>
+              <extension-registry-components
+                v-if="overviewExtensions.length > 0"
+                name="NotesOverview"
+                type="notes-overview-extensions"
+                :params="extensionParams"
+                element-class="ms-3"
+                parent-element="span"
+                element="span" />
+            </p>
           </div>
           <p
             v-if="hasSummary"
@@ -268,15 +279,23 @@
         </a>
       </div>
     </div>
+    <exo-confirm-dialog
+      ref="DeleteNoteDialog"
+      :message="confirmMessage"
+      :title="hasDraft ? $t('popup.confirmation.delete.draft') : $t('popup.confirmation.delete')"
+      :ok-label="$t('notes.button.delete')"
+      :cancel-label="$t('notes.button.cancel')"
+      persistent
+      @ok="deleteNote()"
+      @dialog-opened="$emit('confirmDialogOpened')"
+      @dialog-closed="$emit('confirmDialogClosed')" />
     <notes-actions-menu
       v-if="!isMobile"
-      :note="note"
-      :default-path="defaultPath" />
+      :note="note" />
     <notes-mobile-action-menu
       v-else
       ref="notesMobileActionMenu"
-      :note="note"
-      :default-path="defaultPath" />
+      :note="note" />
     <note-treeview-drawer
       ref="notesBreadcrumb" />
     <version-history-drawer
@@ -289,21 +308,28 @@
       ref="noteVersionsHistoryDrawer" />
     <note-import-drawer
       ref="noteImportDrawer" />
-    <exo-confirm-dialog
-      ref="DeleteNoteDialog"
-      :message="confirmMessage"
-      :title="hasDraft ? $t('popup.confirmation.delete.draft') : $t('popup.confirmation.delete')"
-      :ok-label="$t('notes.button.ok')"
-      :cancel-label="$t('notes.button.cancel')"
-      persistent
-      @ok="deleteNote()"
-      @dialog-opened="$emit('confirmDialogOpened')"
-      @dialog-closed="$emit('confirmDialogClosed')" />
+    <note-featured-image-drawer
+      ref="featuredImageDrawer"
+      :note="note"
+      :has-featured-image="hasFeaturedImage" />
+    <note-publication-target-drawer />
+    <note-publication-drawer
+      ref="publicationDrawer"
+      :has-featured-image="hasFeaturedImage"
+      :is-publishing="isPublishing"
+      :params="{
+        spaceId: spaceId,
+        allowedTargets: publishTargets,
+        canPublish: canPublish,
+        canSchedule: canScheduleNotePublication
+      }"
+      :edit-mode="published"
+      @publish="publishNote" />
   </v-app>
 </template>
 <script>
 
-import { notesConstants } from '../../../javascript/eXo/wiki/notesConstants.js';
+import {notesConstants} from '../../../javascript/eXo/wiki/notesConstants.js';
 import html2canvas from 'html2canvas';
 import JSPDF from 'jspdf';
 
@@ -362,7 +388,13 @@ export default {
       translationsMenu: false,
       originalVersion: { value: '', text: this.$t('notes.label.translation.originalVersion') },
       illustrationBaseUrl: `${eXo.env.portal.context}/${eXo.env.portal.rest}/notes/illustration/`,
-      initialized: false
+      initialized: false,
+      overviewExtensions: [],
+      isPublishing: false,
+      publishTargets: [],
+      canPublish: false,
+      canSchedule: false,
+      published: false
     };
   },
   watch: {
@@ -400,6 +432,19 @@ export default {
     }
   },
   computed: {
+    extensionParams() {
+      return {
+        entityId: this.entityId,
+        entityType: this.entityType,
+        editMode: false
+      };
+    },
+    entityId() {
+      return this.note?.draftPage && this.note?.id || this.note.latestVersionId;
+    },
+    entityType() {
+      return this.note.draftPage && 'WIKI_DRAFT_PAGES' || 'WIKI_PAGE_VERSIONS';
+    },
     hasSummary() {
       return this.note?.properties?.summary?.length;
     },
@@ -549,6 +594,9 @@ export default {
     appName() {
       const uris = eXo.env.portal.selectedNodeUri.split('/');
       return uris[uris.length - 1];
+    },
+    canScheduleNotePublication() {
+      return this.note?.canManage || this.canSchedule;
     }
   },
   created() {
@@ -611,15 +659,60 @@ export default {
     this.$root.$on('open-note-history', this.openNoteVersionsHistoryDrawer);
     this.$root.$on('open-note-treeview-export', this.openNoteTreeView);
     this.$root.$on('open-note-import-drawer', this.openImportDrawer);
-
+    this.$root.$on('open-publish-drawer', this.openPublishDrawer);
+    document.addEventListener('notes-extensions-updated', this.refreshOverviewExtensions);
+    document.addEventListener('note-published', this.handleNotePublished);
+    this.refreshOverviewExtensions();
   },
   mounted() {
     this.handleChangePages();
   },
   methods: {
+    publishNote(publicationSettings, note) {
+      const scheduleSettings = publicationSettings?.scheduleSettings;
+      const noteArticle = structuredClone(note || this.note);
+      noteArticle.schedulePostDate = scheduleSettings?.postDate;
+      noteArticle.scheduleUnpublishDate = scheduleSettings?.unpublishDate;
+      noteArticle.activityPosted = publicationSettings?.post;
+      noteArticle.published = publicationSettings?.publish;
+      noteArticle.targets = publicationSettings?.selectedTargets;
+      noteArticle.audience = publicationSettings?.selectedAudience;
+      noteArticle.isHomeDefaultContent = this.isHomeNoteDefaultContent;
+      noteArticle.hasChildren = this.hasChildren;
+      this.isPublishing = true;
+      if (note) {
+        this.$notesService.updateNoteById(note).then(() => {
+          document.dispatchEvent(new CustomEvent('publish-note', {
+            detail: {
+              editPublication: false,
+              article: noteArticle
+            }
+          }));
+        });
+      } else {
+        document.dispatchEvent(new CustomEvent('publish-note', {
+          detail: {
+            editPublication: true,
+            article: noteArticle,
+            scheduleSettings: scheduleSettings,
+          }
+        }));
+      }
+    },
+    openPublishDrawer(publicationParams) {
+      const savedSettings = publicationParams?.savedSettings;
+      this.published = !!savedSettings;
+      this.publishTargets = publicationParams.targets;
+      this.canPublish = publicationParams?.canPublish;
+      this.canSchedule = publicationParams?.canSchedule;
+      this.note = Object.assign(this.note, savedSettings);
+      setTimeout(() => {
+        this.$refs.publicationDrawer.open(this.note);
+      },200);
+    },
     closeMobileActionMenu() {
       setTimeout(() => {
-        this.$refs.notesMobileActionMenu.close();
+        this.$refs.notesMobileActionMenu?.close();
       }, 200);
     },
     openNoteTreeView(note, action) {
@@ -673,7 +766,7 @@ export default {
       if (this.selectedTranslation.value){
         translation = `&translation=${this.selectedTranslation.value}`;
       }
-      window.open(`${eXo.env.portal.context}/${eXo.env.portal.portalName}/notes-editor?noteId=${this.note.id}&parentNoteId=${this.note.parentPageId ? this.note.parentPageId : this.note.id}&spaceGroupId=${eXo.env.portal?.spaceGroup}&spaceName=${eXo.env.portal?.spaceDisplayName}&appName=${this.appName}&isDraft=${this.isDraft}&showMaxWindow=true&hideSharedLayout=true${translation}`, '_blank');
+      window.open(`${eXo.env.portal.context}/${eXo.env.portal.portalName}/notes-editor?noteId=${this.note.id}&parentNoteId=${this.note.parentPageId ? this.note.parentPageId : this.note.id}&spaceGroupId=${eXo.env.portal?.spaceGroup}&spaceName=${eXo.env.portal?.spaceDisplayName}&appName=${this.appName}&isDraft=${this.isDraft}&showMaxWindow=true&hideSharedLayout=true${translation}&spaceId=${eXo.env.portal.spaceId}`, '_blank');
     },
     deleteNote() {
       if (this.hasDraft) {
@@ -971,11 +1064,15 @@ export default {
         if (data?.jsonList?.length) {
           this.noteChildren = data?.jsonList;
         }
+        else {
+          this.noteChildren = [];
+        }
       });
     },
     openNoteChild(item) {
       const noteName = item.path.split('%2F').pop();
       this.$root.$emit('open-note-by-name', noteName);
+      document.dispatchEvent(new CustomEvent('note-navigation-updated', {detail: item}));
     },
     updateNote(noteParam) {
       const note = {
@@ -1031,6 +1128,7 @@ export default {
           this.note.lang = note.lang;
           this.noteContent = note.content;
           this.note.title = note.title;
+          this.note.latestVersionId = note.latestVersionId;
           this.noteTitle = !this.note.parentPageId && this.note.title==='Home' ? `${this.$t('notes.label.noteHome')}` : this.note.title;
         }
         this.updateURL();
@@ -1064,6 +1162,22 @@ export default {
       if (this.initialized) {
         this.$root.$emit('refresh-treeView-items', this.note);
       }
+    },
+    refreshOverviewExtensions() {
+      this.overviewExtensions = extensionRegistry.loadComponents('NotesOverview') || [];
+    },
+    handleNotePublished(event) {
+      const {editPublication, isPublishSchedule, link} = event.detail;
+      this.isPublishing = false;
+      this.$refs.publicationDrawer.close();
+      document.dispatchEvent(new CustomEvent('alert-message-html', {detail: {
+        alertType: 'success',
+        alertMessage: isPublishSchedule && this.$t('notes.schedule.success.message')
+                                   || editPublication && this.$t('notes.publication.settings.update.success')
+                                   || this.$t('notes.publication.success.message'),
+        alertLink: link,
+        alertLinkText: this.$t('notes.view.label')
+      }}));
     }
   }
 };

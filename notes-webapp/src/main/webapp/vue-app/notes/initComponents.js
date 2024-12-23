@@ -1,5 +1,4 @@
 import NotesOverview from './components/NotesOverview.vue';
-import NoteTreeviewDrawer from './components/NoteTreeviewDrawer.vue';
 import NotesActionsMenu from './components/menu/NotesActionsMenu.vue';
 import NoteBreadcrumb from './components/NoteBreadcrumb.vue';
 import NoteImportDrawer from './components/NoteImportDrawer.vue';
@@ -12,10 +11,10 @@ import NotesTranslationMenu from './components/NotesTranslationMenu.vue';
 import NotesActionMenuItems from './components/menu/NotesActionMenuItems.vue';
 import NotesMobileActionMenu from './components/menu/NotesMobileActionMenu.vue';
 import NoteTreeviewItemPrepend from './components/NoteTreeviewItemPrepend.vue';
+import NoteEditorFeaturedImageDrawer from '../notes-rich-editor/components/note-properties/NoteEditorFeaturedImageDrawer.vue';
 
 const components = {
   'notes-overview': NotesOverview,
-  'note-treeview-drawer': NoteTreeviewDrawer,
   'notes-actions-menu': NotesActionsMenu,
   'note-breadcrumb': NoteBreadcrumb,
   'note-import-drawer': NoteImportDrawer,
@@ -27,7 +26,8 @@ const components = {
   'note-content-table-item': NoteContentTableItem,
   'notes-action-menu-items': NotesActionMenuItems,
   'notes-mobile-action-menu': NotesMobileActionMenu,
-  'note-treeview-item-prepend': NoteTreeviewItemPrepend
+  'note-treeview-item-prepend': NoteTreeviewItemPrepend,
+  'note-featured-image-drawer': NoteEditorFeaturedImageDrawer
 };
 
 for (const key in components) {

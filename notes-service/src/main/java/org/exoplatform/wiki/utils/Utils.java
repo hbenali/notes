@@ -46,7 +46,6 @@ import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
-import org.apache.commons.collections.map.HashedMap;
 import org.apache.commons.lang3.StringUtils;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -85,11 +84,7 @@ import org.exoplatform.social.core.space.spi.SpaceService;
 import org.exoplatform.social.core.storage.api.IdentityStorage;
 import org.exoplatform.social.core.utils.MentionUtils;
 import org.exoplatform.social.notification.LinkProviderUtils;
-import org.exoplatform.web.WebAppController;
 import org.exoplatform.web.application.RequestContext;
-import org.exoplatform.web.controller.QualifiedName;
-import org.exoplatform.web.controller.router.Router;
-import org.exoplatform.web.controller.router.URIWriter;
 import org.exoplatform.web.url.navigation.NavigationResource;
 import org.exoplatform.web.url.navigation.NodeURL;
 import org.exoplatform.webui.application.WebuiRequestContext;
@@ -606,40 +601,20 @@ public class Utils {
     return PortalContainer.getCurrentRestContextName();
   }
 
-  public static String getPageUrl(Page page){
-    String spaceUri = getSpacesURI(page);
-    StringBuilder spaceUrl = new StringBuilder("/portal");
-    spaceUrl.append(spaceUri);
-    spaceUrl.append("/notes/");
-    if (!StringUtils.isEmpty(page.getId())) {
-      spaceUrl.append(page.getId());
-    }
-    return spaceUrl.toString();
-  }
-
-  public static String getSpacesURI(Page page) {
+  public static String getPageUrl(Page page) {
     try {
-    QualifiedName REQUEST_HANDLER = QualifiedName.create("gtn", "handler");
-    QualifiedName REQUEST_SITE_TYPE = QualifiedName.create("gtn", "sitetype");
-    QualifiedName REQUEST_SITE_NAME = QualifiedName.create("gtn", "sitename");
-    QualifiedName PATH = QualifiedName.create("gtn", "path");
-    SpaceService spaceService = CommonsUtils.getService(SpaceService.class);
-    WebAppController webAppController = CommonsUtils.getService(WebAppController.class);
-    Router router = webAppController.getRouter();
+      SpaceService spaceService = CommonsUtils.getService(SpaceService.class);
       Space space = spaceService.getSpaceByGroupId(page.getWikiOwner());
-      if(space==null){
-        return "";
+      if (space != null) {
+        StringBuilder spaceUrl = new StringBuilder("/portal/s/");
+        spaceUrl.append(space.getId());
+        spaceUrl.append("/notes/");
+        if (!StringUtils.isEmpty(page.getId())) {
+          spaceUrl.append(page.getId());
+        }
+        return spaceUrl.toString();
       }
-      Map<QualifiedName, String> qualifiedName = new HashedMap();
-      qualifiedName.put(REQUEST_HANDLER, "portal");
-      qualifiedName.put(REQUEST_SITE_TYPE, "group");
-
-        StringBuilder urlBuilder = new StringBuilder();
-        qualifiedName.put(REQUEST_SITE_NAME, space.getGroupId());
-        qualifiedName.put(PATH, space.getPrettyName());
-        router.render(qualifiedName, new URIWriter(urlBuilder));
-        return(urlBuilder.toString());
-
+      return "";
     } catch (Exception e) {
       return "";
     }
